@@ -2,6 +2,7 @@ import pygame
 from pygame.locals import *
 import subprocess
 import sys
+import os
 
 
 WIDTH, HEIGHT = 1500, 800
@@ -19,7 +20,7 @@ class Grid:
         self.isDragging = False
         self.mousePositions = []
         self.zoom = 1
-        self.maze_image = None
+        self.maze_surface = None
 
     def cell_width(self):
         return self.cell_size[0] * self.zoom
@@ -35,7 +36,10 @@ class Grid:
 
     def rect(self):
         return pygame.Rect(
-            self.transform.x, self.transform.y, self.maze_width() * self.zoom, self.maze_height() * self.zoom
+            self.transform.x,
+            self.transform.y,
+            self.maze_width() * self.zoom,
+            self.maze_height() * self.zoom,
         )
 
     def event_handler(self, event):
@@ -64,10 +68,20 @@ class Grid:
 
     def get_maze(self):
         self.maze = []
-        result = subprocess.run("./main", capture_output=True, text=True).stdout
+        cmd = ["./maze-generator", str(self.width), str(self.height)]
 
-        rows = result.split("\n")
+        # Check if the executable exists
+        if not os.path.exists("./maze-generator"):
+            print("Error: Executable './maze-generator' not found.")
+            return
 
+        # Run the command and capture the output
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"Error: {result.stderr}")
+            return
+
+        rows = result.stdout.split("\n")
         for row in rows:
             formatted_row = []
 
@@ -135,7 +149,7 @@ def main():
     run = True
     clock = pygame.time.Clock()
 
-    grid = Grid(21, 21, (20, 20))
+    grid = Grid(501, 501, (20, 20))
     grid.get_maze()
 
     while run:

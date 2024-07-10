@@ -141,8 +141,17 @@ void recursive_backtracking(int width, int height, int maze[height][width]) {
 }
 
 int main(int argc, char *argv[]) {
-    int maze_width = 21;
-    int maze_height = 21;
+
+    int maze_width;
+    int maze_height;
+
+    if (argc == 3) {
+        maze_width = atoi(argv[1]);
+        maze_height = atoi(argv[2]);
+    } else {
+        printf("Pass the height and width as arguments");
+        return 1;
+    }
 
     int maze[maze_height][maze_width];
 
