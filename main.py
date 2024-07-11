@@ -86,7 +86,7 @@ class Grid:
             formatted_row = []
 
             for cell in row:
-                if cell == "1" or cell == "0" or cell == "2" or cell == "3":
+                if cell in "01234":
                     formatted_row.append(int(cell))
 
             self.maze.append(formatted_row)
@@ -94,6 +94,14 @@ class Grid:
         for row in self.maze:
             if row == []:
                 self.maze.remove(row)
+
+        with open("maze.txt", "w") as file:
+            for count, row in enumerate(self.maze):
+                row_string = "S"
+                for cell in row:
+                    row_string = row_string + str(cell)
+
+                file.write(row_string)
 
         self.generate_rects()
 
@@ -149,7 +157,7 @@ def main():
     run = True
     clock = pygame.time.Clock()
 
-    grid = Grid(501, 501, (20, 20))
+    grid = Grid(21, 21, (20, 20))
     grid.get_maze()
 
     while run:
