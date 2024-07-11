@@ -10,11 +10,12 @@ WINDOW = pygame.display.set_mode((WIDTH, HEIGHT))
 
 
 class Grid:
-    def __init__(self, width, height, cell_size):
+    def __init__(self, width, height, cell_size, filename="maze.txt"):
         self.transform = pygame.math.Vector2()
         self.width = width
         self.height = height
         self.cell_size = cell_size
+        self.filename = filename
         self.maze = []
         self.maze_rects = []
         self.isDragging = False
@@ -54,6 +55,11 @@ class Grid:
                 self.mousePositions.clear()
         if event.type == pygame.MOUSEWHEEL:
             self.zoom += event.y * 0.1
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:
+                self.get_maze()
+            if event.key == pygame.K_RETURN:
+                self.solve_maze()
 
     def handle_dragging(self):
         if self.isDragging:
@@ -70,12 +76,10 @@ class Grid:
         self.maze = []
         cmd = ["./maze-generator", str(self.width), str(self.height)]
 
-        # Check if the executable exists
         if not os.path.exists("./maze-generator"):
             print("Error: Executable './maze-generator' not found.")
             return
 
-        # Run the command and capture the output
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             print(f"Error: {result.stderr}")
@@ -95,7 +99,7 @@ class Grid:
             if row == []:
                 self.maze.remove(row)
 
-        with open("maze.txt", "w") as file:
+        with open(self.filename, "w") as file:
             for count, row in enumerate(self.maze):
                 row_string = "S"
                 for cell in row:
@@ -117,7 +121,8 @@ class Grid:
                 )
                 self.maze_rects.append((cell_rect, cell))
 
-        self.maze_surface = pygame.Surface((self.maze_width(), self.maze_height()))
+        self.maze_surface = pygame.Surface(
+            (self.maze_width(), self.maze_height()))
         self.draw_rects(self.maze_surface)
 
     def draw_rects(self, surface):
@@ -131,16 +136,49 @@ class Grid:
                     pygame.draw.rect(surface, (0, 255, 0), cell[0])
                 case 3:
                     pygame.draw.rect(surface, (255, 0, 0), cell[0])
+                case 4:
+                    pygame.draw.rect(surface, (255, 255, 0), cell[0])
 
     def draw(self):
         if self.maze_surface is None:
-            self.maze_surface = pygame.Surface((self.maze_width(), self.maze_height()))
+            self.maze_surface = pygame.Surface(
+                (self.maze_width(), self.maze_height()))
             self.draw_rects(self.maze_surface)
 
         WINDOW.blit(
-            pygame.transform.scale_by(self.maze_surface, (self.zoom, self.zoom)),
+            pygame.transform.scale_by(
+                self.maze_surface, (self.zoom, self.zoom)),
             self.transform,
         )
+
+    def solve_maze(self):
+        self.maze = []
+        cmd = ["./maze-solver", str(self.width), str(self.height), self.filename]
+
+        if not os.path.exists("./maze-solver"):
+            print("Error: Executable './maze-solver' not found.")
+            return
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"Error: {result.stderr}")
+            return
+
+        rows = result.stdout.split("\n")
+        for row in rows:
+            formatted_row = []
+
+            for cell in row:
+                if cell in "01234":
+                    formatted_row.append(int(cell))
+
+            self.maze.append(formatted_row)
+
+        for row in self.maze:
+            if row == []:
+                self.maze.remove(row)
+
+        self.generate_rects()
 
 
 def draw(grid):
@@ -165,9 +203,6 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    grid.get_maze()
             grid.event_handler(event)
 
         draw(grid)

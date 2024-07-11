@@ -81,15 +81,22 @@ void carve_passage(int row, int column, int width, int height,
 void create_entrances_new(int width, int height, int maze[height][width]) {
     enum Directions directions[] = {LEFT, RIGHT, UP, DOWN};
     int random_coordinate;
+    int cell_value;
 
     randomise_directions(directions);
 
     for (int i = 0; i < 2; i++) {
+        if (i == 0) {
+            cell_value = 2;
+        }
+        else {
+            cell_value = 3;
+        }
         switch (directions[i]) {
         case LEFT:
             random_coordinate = rand() % height;
             if (maze[random_coordinate][1] == 0) {
-                maze[random_coordinate][0] = 0;
+                maze[random_coordinate][0] = cell_value;
             } else {
                 i--;
             }
@@ -97,7 +104,7 @@ void create_entrances_new(int width, int height, int maze[height][width]) {
         case RIGHT:
             random_coordinate = rand() % height;
             if (maze[random_coordinate][width - 2] == 0) {
-                maze[random_coordinate][width - 1] = 0;
+                maze[random_coordinate][width - 1] = cell_value;
             } else {
                 i--;
             }
@@ -105,7 +112,7 @@ void create_entrances_new(int width, int height, int maze[height][width]) {
         case UP:
             random_coordinate = rand() % width;
             if (maze[1][random_coordinate] == 0) {
-                maze[0][random_coordinate] = 0;
+                maze[0][random_coordinate] = cell_value;
             } else {
                 i--;
             }
@@ -113,7 +120,7 @@ void create_entrances_new(int width, int height, int maze[height][width]) {
         case DOWN:
             random_coordinate = rand() % width;
             if (maze[height - 2][random_coordinate] == 0) {
-                maze[height - 1][random_coordinate] = 0;
+                maze[height - 1][random_coordinate] = cell_value;
             } else {
                 i--;
             }
