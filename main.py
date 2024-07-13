@@ -9,6 +9,33 @@ WIDTH, HEIGHT = 1500, 800
 WINDOW = pygame.display.set_mode((WIDTH, HEIGHT))
 
 
+class TextBox:
+    def __init__(self, x, y, font, text=""):
+        self.transform = pygame.math.Vector2((x, y))
+        self.font = font
+        self.text = text
+        self.isSelected = False
+        self.textSurface = pygame.Surface((0, 0))
+
+    def update(self):
+        self.textSurface = self.font.render(self.text, True, (0, 0, 0))
+
+
+    def event_handler(self, event):
+        if event.type == pygame.KEYDOWN:
+            if self.isSelected:
+                self.text += event.unicode
+
+    def draw(self):
+        WINDOW.blit(
+            self.textSurface,
+            (
+                self.transform.x - self.textSurface.get_width() // 2,
+                self.transform.y - self.textSurface.get_height() // 2,
+            ),
+        )
+
+
 class Grid:
     def __init__(self, width, height, cell_size, filename="maze.txt"):
         self.transform = pygame.math.Vector2()
@@ -121,8 +148,7 @@ class Grid:
                 )
                 self.maze_rects.append((cell_rect, cell))
 
-        self.maze_surface = pygame.Surface(
-            (self.maze_width(), self.maze_height()))
+        self.maze_surface = pygame.Surface((self.maze_width(), self.maze_height()))
         self.draw_rects(self.maze_surface)
 
     def draw_rects(self, surface):
@@ -141,13 +167,11 @@ class Grid:
 
     def draw(self):
         if self.maze_surface is None:
-            self.maze_surface = pygame.Surface(
-                (self.maze_width(), self.maze_height()))
+            self.maze_surface = pygame.Surface((self.maze_width(), self.maze_height()))
             self.draw_rects(self.maze_surface)
 
         WINDOW.blit(
-            pygame.transform.scale_by(
-                self.maze_surface, (self.zoom, self.zoom)),
+            pygame.transform.scale_by(self.maze_surface, (self.zoom, self.zoom)),
             self.transform,
         )
 
@@ -181,32 +205,40 @@ class Grid:
         self.generate_rects()
 
 
-def draw(grid):
+def draw(grid, heightTextBox):
     WINDOW.fill((255, 255, 255))
     grid.draw()
+    heightTextBox.draw()
     pygame.display.update()
 
 
-def update(grid):
+def update(grid, heightTextBox):
     grid.update()
+    heightTextBox.update()
 
 
 def main():
+    pygame.init()
+    pygame.font.init()
+
     run = True
+    font = pygame.font.SysFont("Arial", 36)
+
+    heightTextBox = TextBox(20, 20, font, "height")
     clock = pygame.time.Clock()
 
-    grid = Grid(21, 21, (20, 20))
+    grid = Grid(31, 31, (20, 20))
     grid.get_maze()
 
     while run:
-        clock.tick(60)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
             grid.event_handler(event)
+            heightTextBox.event_handler(event)
 
-        draw(grid)
-        update(grid)
+        draw(grid, heightTextBox)
+        update(grid, heightTextBox)
 
     pygame.quit()
     sys.exit()

@@ -1,3 +1,30 @@
-/main
-/maze-solver
-/maze-generator
+# Compiled object files
+*.o
+
+# Compiled static libraries
+*.a
+
+# Compiled dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Executables
+test
+maze-solver
+maze-generator
+
+# Debug and log files
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+
+# Dependency files
+*.d
+
+# Build directories
+build/
+bin/
+obj/

@@ -1,13 +1,9 @@
+#include "maze.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
-// 0 is empty
-// 1 is wall
-
-enum Directions { LEFT, RIGHT, UP, DOWN };
 
 void populate_maze(int width, int height, int maze[height][width], int number) {
     for (int i = 0; i < height; i++) {
@@ -29,10 +25,10 @@ void show_maze(int width, int height, int maze[height][width]) {
     }
 }
 
-void randomise_directions(enum Directions directions[]) {
+void randomise_directions(Directions directions[]) {
     for (int i = 0; i < 4; i++) {
         int j = rand() % 4;
-        enum Directions temp = directions[i];
+        Directions temp = directions[i];
         directions[i] = directions[j];
         directions[j] = temp;
     }
@@ -46,7 +42,7 @@ void carve_passage(int row, int column, int width, int height,
     visited_cells[row][column] = true;
     maze[row][column] = 0;
 
-    enum Directions directions[] = {LEFT, RIGHT, UP, DOWN};
+    Directions directions[] = {LEFT, RIGHT, UP, DOWN};
 
     randomise_directions(directions);
 
@@ -79,7 +75,7 @@ void carve_passage(int row, int column, int width, int height,
 }
 
 void create_entrances_new(int width, int height, int maze[height][width]) {
-    enum Directions directions[] = {LEFT, RIGHT, UP, DOWN};
+    Directions directions[] = {LEFT, RIGHT, UP, DOWN};
     int random_coordinate;
     int cell_value;
 
@@ -88,8 +84,7 @@ void create_entrances_new(int width, int height, int maze[height][width]) {
     for (int i = 0; i < 2; i++) {
         if (i == 0) {
             cell_value = 2;
-        }
-        else {
+        } else {
             cell_value = 3;
         }
         switch (directions[i]) {
@@ -166,6 +161,15 @@ int main(int argc, char *argv[]) {
 
     populate_maze(maze_width, maze_height, maze, 1);
     recursive_backtracking(maze_width, maze_height, maze);
-    show_maze(maze_width, maze_height, maze);
+
+    Maze *mazeGraph = convert_to_graph(maze_width, maze_height, maze);
+
+    printf("\nNODE %d %d", mazeGraph->nodes[0]->row,
+           mazeGraph->nodes[0]->column);
+    printf("\nNODE %d %d", mazeGraph->nodes[0]->next->row,
+           mazeGraph->nodes[0]->next->column);
+    // show_maze(maze_width, maze_height, maze);
+    show_graph(mazeGraph);
+    printf("\nshowed graph");
     return 0;
 }
