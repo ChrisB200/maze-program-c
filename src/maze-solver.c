@@ -14,73 +14,6 @@ void randomise_directions(Directions directions[]) {
     }
 }
 
-bool carve_passage(int row, int column, maze_t *maze) {
-    if (row < 0 || row >= maze->height || column < 0 || column >= maze->width) {
-        return false;
-    }
-
-    if (maze->grid[row][column] == 3) {
-        return true;
-    }
-
-    if (maze->grid[row][column] == 1) {
-        return false;
-    }
-
-    Directions directions[] = {LEFT, RIGHT, UP, DOWN};
-    int new_row;
-    int new_column;
-    bool is_solved;
-
-    maze->grid[row][column] = 4;
-    randomise_directions(directions);
-
-    for (int i = 0; i < 4; i++) {
-        new_row = row;
-        new_column = column;
-        switch (directions[i]) {
-        case LEFT:
-            new_column--;
-            break;
-        case RIGHT:
-            new_column++;
-            break;
-        case UP:
-            new_row--;
-            break;
-        case DOWN:
-            new_row++;
-            break;
-        }
-        is_solved = carve_passage(new_row, new_column, maze);
-
-        if (is_solved == true) {
-            break;
-        }
-    }
-
-    return is_solved;
-}
-
-void recursive_backtracking(maze_t *maze) {
-    int entrance_row;
-    int entrance_height;
-    srand(time(NULL));
-
-    for (int i = 0; i < maze->height; i++) {
-        for (int j = 0; j < maze->width; j++) {
-            if (maze->grid[i][j] == 2) {
-                entrance_row = i;
-                entrance_height = j;
-            }
-        }
-    }
-
-    bool is_passage = carve_passage(entrance_row, entrance_height, maze);
-    maze->grid[entrance_row][entrance_height] = 2;
-}
-
-
 void shortest_path(maze_t *maze) {
     node_t *entrance = maze->nodes[maze->start];
     node_t *exit = maze->nodes[maze->end];
@@ -88,7 +21,7 @@ void shortest_path(maze_t *maze) {
 
     while (true) {
         if (curr->parent == -1) {
-            continue;
+            break;
         }
 
         if (curr->vertex == entrance->vertex) {
