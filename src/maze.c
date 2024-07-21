@@ -18,12 +18,12 @@ node_t *create_node(int vertex, int data, int row, int col) {
                 vertex);
         return NULL;
     }
-    
+
     // assign values
     new_node->vertex = vertex;
     new_node->row = row;
     new_node->col = col;
-    
+
     // set default values for walls
     for (int i = 0; i < 4; i++) {
         new_node->walls[i] = true;
@@ -84,149 +84,20 @@ void free_maze(maze_t *maze) {
     free(maze);
 }
 
-void add_edge(maze_t *maze, node_t *src, node_t *dest) {
-    node_t *curr = maze->nodes[src->vertex];
-    node_t *prev = curr;
-    while (true) {
-        if (curr == NULL) {
-            break;
-        }
-
-        if (curr->vertex == dest->vertex) {
-            return;
-        }
-        prev = curr;
-        curr = curr->next;
-    }
-    curr = prev;
-
-    // src edge connects to destination edge
-    node_t *new_node =
-        create_node(dest->vertex, dest->data, dest->row, dest->column);
-    curr->next = new_node;
-   }
+void add_edge(maze_t *maze, node_t *src, node_t *dest) {}
 
 void print_graph(maze_t *maze) {
     for (int i = 0; i < maze->num_nodes; i++) {
         node_t *curr = maze->nodes[i];
         if (curr == NULL)
             continue;
-        printf("\nAdjacency list of vertex %d (r %d, c %d, d %d): ",
-               curr->vertex, curr->row, curr->column, curr->data);
+        printf("\nAdjacency list of vertex %d (r %d, c %d): ", curr->vertex,
+               curr->row, curr->col);
         while (curr != NULL) {
-            printf("(Vertex %d (%d, %d, %d)) -> ", curr->vertex, curr->row,
-                   curr->column, curr->data);
+            printf("(Vertex %d (%d, %d)) -> ", curr->vertex, curr->row,
+                   curr->col);
             curr = curr->next;
         }
         printf("NULL");
-    }
-}
-
-int count_num_nodes(int width, int height, int **grid) {
-    int num_nodes = 0;
-    for (int i = 0; i < height; i++) {
-        for (int j = 0; j < width; j++) {
-            if (grid[i][j] != 1) {
-                num_nodes++;
-            }
-        }
-    }
-    return num_nodes;
-}
-
-node_t *search_for_node(maze_t *maze, int row, int column) {
-    for (int i = 0; i < maze->num_nodes; i++) {
-        node_t *src = maze->nodes[i];
-        if (src != NULL && row == src->row && column == src->column) {
-            return src;
-        }
-    }
-    return NULL;
-}
-
-void link_neighbours(maze_t *maze, node_t *src) {
-    Directions directions[] = {LEFT, RIGHT, UP, DOWN};
-
-    // look in each direction
-    for (int i = 0; i < 4; i++) {
-        int new_row = src->row;
-        int new_column = src->column;
-
-        switch (directions[i]) {
-        case LEFT:
-            new_column--;
-            break;
-        case RIGHT:
-            new_column++;
-            break;
-        case UP:
-            new_row--;
-            break;
-        case DOWN:
-            new_row++;
-            break;
-        }
-
-        // check if new row or new column is out of bounds
-        if (new_column >= maze->width || new_column < 0 ||
-            new_row >= maze->height || new_row < 0) {
-            continue;
-        }
-
-        // searches for node that has the same row and column
-        node_t *dest = search_for_node(maze, new_row, new_column);
-        if (dest == NULL) {
-            continue;
-        }
-
-        add_edge(maze, src, dest);
-    }
-}
-
-void generate_nodes(maze_t *maze, int positions[4]) {
-    // create the nodes for every empty space in grid
-    int count = 0;
-    for (int i = 0; i < maze->height; i++) {
-        for (int j = 0; j < maze->width; j++) {
-            if (maze->grid[i][j] != 1) {
-                node_t *curr = create_node(count, maze->grid[i][j], i, j);
-                if (i == positions[0] && j == positions[1]) {
-                    curr->data = 2;
-                    maze->start = curr->vertex;
-                }
-                if (i == positions[2] && j == positions[3]) {
-                    curr->data = 3;
-                    maze->end = curr->vertex;
-                }
-                maze->nodes[count] = curr;
-                count++;
-            }
-        }
-    }
-
-    // create edges based on neighbours for each node
-    node_t *curr;
-    for (int i = 0; i < maze->num_nodes; i++) {
-        curr = maze->nodes[i];
-        link_neighbours(maze, curr);
-    }
-}
-
-// populates the 2d array with 1 (walls)
-void populate_grid(int width, int height, int **grid, int number) {
-    for (int i = 0; i < height; i++) {
-        for (int j = 0; j < width; j++) {
-            grid[i][j] = number;
-        }
-    }
-}
-
-// prints out the maze in a correct format
-void print_grid(maze_t *maze) {
-    for (int i = 0; i < maze->height; i++) {
-        for (int j = 0; j < maze->width; j++) {
-            printf("%d ", maze->grid[i][j]);
-        }
-        printf("\n");
     }
 }

@@ -34,11 +34,5 @@ void free_node(node_t *node);
 void free_maze(maze_t *maze);
 void add_edge(maze_t *maze, node_t *src, node_t *dest);
 void print_graph(maze_t *maze);
-int count_num_nodes(int width, int height, int **grid);
-node_t *search_for_node(maze_t *maze, int row, int column);
-void link_neighbours(maze_t *maze, node_t *src);
-void generate_nodes(maze_t *maze, int positions[4]);
-void populate_grid(int width, int height, int **grid, int number);
-void print_grid(maze_t *maze);
 
 #endif
