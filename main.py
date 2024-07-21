@@ -3,37 +3,59 @@ from pygame.locals import *
 import subprocess
 import sys
 import os
+import ctypes
+
+
+def load_shared_library(filename):
+    path = os.path.join(os.path.dirname(__file__), filename)
+    return ctypes.CDLL(path)
 
 
 WIDTH, HEIGHT = 1500, 800
 WINDOW = pygame.display.set_mode((WIDTH, HEIGHT))
 
-
-class TextBox:
-    def __init__(self, x, y, font, text=""):
-        self.transform = pygame.math.Vector2((x, y))
-        self.font = font
-        self.text = text
-        self.isSelected = False
-        self.textSurface = pygame.Surface((0, 0))
-
-    def update(self):
-        self.textSurface = self.font.render(self.text, True, (0, 0, 0))
+generator_lib = load_shared_library("lib/maze-generator.so")
+solver_lib = load_shared_library("lib/maze-solver.so")
 
 
-    def event_handler(self, event):
-        if event.type == pygame.KEYDOWN:
-            if self.isSelected:
-                self.text += event.unicode
+class Node(ctypes.Structure):
+    pass
 
-    def draw(self):
-        WINDOW.blit(
-            self.textSurface,
-            (
-                self.transform.x - self.textSurface.get_width() // 2,
-                self.transform.y - self.textSurface.get_height() // 2,
-            ),
-        )
+
+Node._fields_ = [
+    ("vertex", ctypes.c_int),
+    ("data", ctypes.c_int),
+    ("row", ctypes.c_int),
+    ("column", ctypes.c_int),
+    ("next", ctypes.POINTER(Node)),
+    ("parent", ctypes.c_int),
+]
+
+
+class Maze(ctypes.Structure):
+    _fields_ = [
+        ("width", ctypes.c_int),
+        ("height", ctypes.c_int),
+        ("size", ctypes.c_int),
+        ("num_nodes", ctypes.c_int),
+        ("nodes", ctypes.POINTER(ctypes.POINTER(Node))),
+        ("start", ctypes.c_int),
+        ("end", ctypes.c_int),
+        ("grid", ctypes.POINTER(ctypes.POINTER(ctypes.c_int))),
+    ]
+
+
+# function prototypes
+generator_lib.generate_maze.argtypes = [ctypes.c_int, ctypes.c_int]
+generator_lib.generate_maze.restype = ctypes.POINTER(Maze)
+
+generator_lib.free_maze.argtypes = [ctypes.POINTER(Maze)]
+
+generator_lib.print_graph.argtypes = [ctypes.POINTER(Maze)]
+
+generator_lib.print_grid.argtypes = [ctypes.POINTER(Maze)]
+
+solver_lib.solve_maze.argtypes = [ctypes.POINTER(Maze)]
 
 
 class Grid:
@@ -43,12 +65,13 @@ class Grid:
         self.height = height
         self.cell_size = cell_size
         self.filename = filename
-        self.maze = []
+        self.maze = None
         self.maze_rects = []
         self.isDragging = False
         self.mousePositions = []
         self.zoom = 1
         self.maze_surface = None
+        self.get_maze(width, height)
 
     def cell_width(self):
         return self.cell_size[0] * self.zoom
@@ -84,7 +107,7 @@ class Grid:
             self.zoom += event.y * 0.1
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
-                self.get_maze()
+                self.get_maze(self.width, self.height)
             if event.key == pygame.K_RETURN:
                 self.solve_maze()
 
@@ -99,50 +122,28 @@ class Grid:
     def update(self):
         self.handle_dragging()
 
-    def get_maze(self):
-        self.maze = []
-        cmd = ["./maze-generator", str(self.width), str(self.height)]
+    def get_maze(self, width, height):
+        self.width = width
+        self.height = height
 
-        if not os.path.exists("./maze-generator"):
-            print("Error: Executable './maze-generator' not found.")
-            return
+        if self.maze:
+            generator_lib.free_maze(self.maze)
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            print(f"Error: {result.stderr}")
-            return
-
-        rows = result.stdout.split("\n")
-        for row in rows:
-            formatted_row = []
-
-            for cell in row:
-                if cell in "01234":
-                    formatted_row.append(int(cell))
-
-            self.maze.append(formatted_row)
-
-        for row in self.maze:
-            if row == []:
-                self.maze.remove(row)
-
-        with open(self.filename, "w") as file:
-            for count, row in enumerate(self.maze):
-                row_string = "S"
-                for cell in row:
-                    row_string = row_string + str(cell)
-
-                file.write(row_string)
-
+        self.maze = generator_lib.generate_maze(self.width, self.height)
+        print("test")
         self.generate_rects()
+        print("generated")
 
     def generate_rects(self):
         self.maze_rects = []
-        for county, row in enumerate(self.maze):
-            for countx, cell in enumerate(row):
+
+        for i in range(self.maze.contents.height):
+            row = self.maze.contents.grid[i]
+            for j in range(self.maze.contents.width):
+                cell = row[j]
                 cell_rect = pygame.Rect(
-                    countx * self.cell_size[0],
-                    county * self.cell_size[1],
+                    i * self.cell_size[0],
+                    j * self.cell_size[1],
                     self.cell_size[0],
                     self.cell_size[1],
                 )
@@ -164,6 +165,8 @@ class Grid:
                     pygame.draw.rect(surface, (255, 0, 0), cell[0])
                 case 4:
                     pygame.draw.rect(surface, (255, 255, 0), cell[0])
+                case 5:
+                    pygame.draw.rect(surface, (0, 255, 255), cell[0])
 
     def draw(self):
         if self.maze_surface is None:
@@ -176,45 +179,19 @@ class Grid:
         )
 
     def solve_maze(self):
-        self.maze = []
-        cmd = ["./maze-solver", str(self.width), str(self.height), self.filename]
-
-        if not os.path.exists("./maze-solver"):
-            print("Error: Executable './maze-solver' not found.")
-            return
-
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            print(f"Error: {result.stderr}")
-            return
-
-        rows = result.stdout.split("\n")
-        for row in rows:
-            formatted_row = []
-
-            for cell in row:
-                if cell in "01234":
-                    formatted_row.append(int(cell))
-
-            self.maze.append(formatted_row)
-
-        for row in self.maze:
-            if row == []:
-                self.maze.remove(row)
-
+        if self.maze:
+            solver_lib.solve_maze(self.maze)
         self.generate_rects()
 
 
-def draw(grid, heightTextBox):
+def draw(grid):
     WINDOW.fill((255, 255, 255))
     grid.draw()
-    heightTextBox.draw()
     pygame.display.update()
 
 
-def update(grid, heightTextBox):
+def update(grid):
     grid.update()
-    heightTextBox.update()
 
 
 def main():
@@ -222,23 +199,24 @@ def main():
     pygame.font.init()
 
     run = True
-    font = pygame.font.SysFont("Arial", 36)
 
-    heightTextBox = TextBox(20, 20, font, "height")
     clock = pygame.time.Clock()
 
-    grid = Grid(31, 31, (20, 20))
-    grid.get_maze()
+    grid = Grid(21, 21, (20, 20))
 
     while run:
+        clock.tick(60)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
             grid.event_handler(event)
-            heightTextBox.event_handler(event)
 
-        draw(grid, heightTextBox)
-        update(grid, heightTextBox)
+        draw(grid)
+        update(grid)
+
+    if grid.maze:
+        generator_lib.free_maze(grid.maze)
+        grid.maze = None
 
     pygame.quit()
     sys.exit()
