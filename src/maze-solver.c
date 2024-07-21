@@ -51,7 +51,7 @@ void bfs(maze_t *maze, int entrance, int exit) {
     bool visited[max_size];
 
     // intialise queue
-    int queue[max_size];
+    int queue[max_size*2];
     int rear = -1;
     int front = 0;
 
@@ -66,6 +66,12 @@ void bfs(maze_t *maze, int entrance, int exit) {
     visited[entrance] = true;
 
     while (front <= rear) {
+        printf("\nfront: %d, rear: %d", front, rear);
+        printf("\n");
+        for (int i = front; i < rear; i++) {
+            printf("%d ", queue[i]);
+        }
+        printf("\n");
         // get vertex from queue
         int vertex = queue[front];
         node_t *curr = maze->nodes[vertex];
@@ -75,16 +81,16 @@ void bfs(maze_t *maze, int entrance, int exit) {
         if (vertex == exit)
             break;
 
-        maze->grid[curr->row][curr->column] = 4;
-
         // add all adjacent vertices to queue
         curr = maze->nodes[vertex];
         while (curr != NULL) {
+            printf("\nadjacent");
             if (visited[curr->vertex] == false) {
                 // add adjacent vertex to queue
                 rear++;
                 queue[rear] = curr->vertex;
                 visited[curr->vertex] = true;
+                maze->grid[curr->row][curr->column] = 4;
                 maze->nodes[curr->vertex]->parent = vertex;
             }
             curr = curr->next;

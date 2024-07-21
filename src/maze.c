@@ -10,35 +10,7 @@
 
 #include "../include/maze.h"
 
-int **create_grid(int height, int width) {
-    int **grid;
-    grid = (int **)malloc(height * sizeof(int *));
-
-    if (grid == NULL) {
-        fprintf(stderr, "Memory allocation failed for the grid\n");
-        return NULL;
-    }
-
-    for (int i = 0; i < height; i++) {
-        grid[i] = (int *)malloc(width * sizeof(int));
-
-        if (grid[i] == NULL) {
-            fprintf(stderr, "Memory allocation failed for row %d\n", i);
-
-            for (int j = 0; j < i; j++) {
-                free(grid[j]);
-            }
-            free(grid);
-            return NULL;
-        }
-        for (int j = 0; j < width; j++) {
-            grid[i][j] = 1;
-        }
-    }
-    return grid;
-}
-
-node_t *create_node(int vertex, int data, int row, int column) {
+node_t *create_node(int vertex, int data, int row, int col) {
     node_t *new_node = (node_t *)malloc(sizeof(node_t));
 
     if (new_node == NULL) {
@@ -46,33 +18,36 @@ node_t *create_node(int vertex, int data, int row, int column) {
                 vertex);
         return NULL;
     }
-
+    
+    // assign values
     new_node->vertex = vertex;
-    new_node->data = data;
     new_node->row = row;
-    new_node->column = column;
-    new_node->parent = -1;
+    new_node->col = col;
+    
+    // set default values for walls
+    for (int i = 0; i < 4; i++) {
+        new_node->walls[i] = true;
+    }
+    new_node->visited = false;
+    new_node->searched = false;
     new_node->next = NULL;
 
     return new_node;
 }
 
-maze_t *create_maze(int width, int height, int **grid) {
+maze_t *create_maze(int rows, int cols) {
     maze_t *maze = (maze_t *)malloc(sizeof(maze_t));
 
     if (maze == NULL) {
         fprintf(stderr, "Memory allocation failed for maze\n");
     }
+
     // assign the properties
-    maze->width = width;
-    maze->height = height;
-    maze->num_nodes = count_num_nodes(width, height, grid);
+    maze->rows = rows;
+    maze->cols = cols;
+    maze->num_nodes = rows * cols;
 
-    // allocate the entrance and exit
-    maze->start = 0;
-    maze->end = 0;
-
-    // allocate the adjacency lists
+    // allocate the adjacency lists (array of linked lists)
     maze->nodes = (node_t **)malloc(sizeof(node_t *) * maze->num_nodes);
     if (maze->nodes == NULL) {
         fprintf(stderr, "Memory allocation failed for adjacency lists\n");
@@ -84,29 +59,28 @@ maze_t *create_maze(int width, int height, int **grid) {
         maze->nodes[i] = NULL;
     }
 
-    maze->grid = grid;
-
     // assign the total size
     maze->size = sizeof(*maze);
 
     return maze;
 }
 
+void free_node(node_t *node) {
+    // free all nodes in linked list
+    while (node != NULL) {
+        node_t *tmp = node;
+        node = node->next;
+        free(tmp);
+    }
+}
+
 void free_maze(maze_t *maze) {
+    // free all the nodes
     for (int i = 0; i < maze->num_nodes; i++) {
         node_t *curr = maze->nodes[i];
-        while (curr != NULL) {
-            node_t *tmp = curr;
-            curr = curr->next;
-            free(tmp);
-        }
+        free_node(curr);
     }
     free(maze->nodes);
-
-    for (int i = 0; i < maze->height; i++) {
-        free(maze->grid[i]);
-    }
-    free(maze->grid);
     free(maze);
 }
 

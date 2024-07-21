@@ -55,65 +55,64 @@ void carve_passage(int row, int column, int width, int height, int **grid,
     }
 }
 
-// creates both an entrance and exit in the maze
 void create_entrances(int width, int height, int **grid, int positions[4]) {
-    Directions directions[] = {LEFT, RIGHT, UP, DOWN};
+    Directions directions[] = { LEFT, RIGHT, UP, DOWN };
     int random_coordinate;
     int cell_value;
 
     randomise_directions(directions);
 
-    // creates both entrances and exits randomly
+    // Creates both entrances and exits randomly
     for (int i = 0; i < 2; i++) {
-        // checks whether its an entrance or exit
+        // Checks whether it's an entrance or exit
         if (i == 0) {
-            cell_value = 2;
+            cell_value = 2; // Entrance
         } else {
-            cell_value = 3;
+            cell_value = 3; // Exit
         }
 
-        // randomly go in the direction if it neighbours a passage
+        // Randomly go in the direction if it neighbors a passage
         switch (directions[i]) {
-        case LEFT:
-            random_coordinate = rand() % height;
-            if (grid[random_coordinate][1] == 0) {
-                grid[random_coordinate][0] = cell_value;
-                positions[i + i] = random_coordinate;
-                positions[i + i + 1] = 0;
-            } else {
-                i--;
-            }
-            break;
-        case RIGHT:
-            random_coordinate = rand() % height;
-            if (grid[random_coordinate][width - 2] == 0) {
-                grid[random_coordinate][width - 1] = cell_value;
-                positions[i + i] = random_coordinate;
-                positions[i + i + 1] = width - 1;
-            } else {
-                i--;
-            }
-            break;
-        case UP:
-            random_coordinate = rand() % width;
-            if (grid[1][random_coordinate] == 0) {
-                grid[0][random_coordinate] = cell_value;
-                positions[i + i] = 0;
-                positions[i + i + 1] = random_coordinate;
-            } else {
-                i--;
-            }
-            break;
-        case DOWN:
-            random_coordinate = rand() % width;
-            if (grid[height - 2][random_coordinate] == 0) {
-                grid[height - 1][random_coordinate] = cell_value;
-                positions[i + i] = height - 1;
-                positions[i + i + 1] = random_coordinate;
-            } else {
-                i--;
-            }
-            break;
+            case LEFT:
+                random_coordinate = rand() % height;
+                if (grid[random_coordinate][1] == 0) {
+                    grid[random_coordinate][0] = cell_value;
+                    positions[i * 2] = random_coordinate;
+                    positions[i * 2 + 1] = 0;
+                } else {
+                    i--;
+                }
+                break;
+            case RIGHT:
+                random_coordinate = rand() % height;
+                if (grid[random_coordinate][width - 2] == 0) {
+                    grid[random_coordinate][width - 1] = cell_value;
+                    positions[i * 2] = random_coordinate;
+                    positions[i * 2 + 1] = width - 1;
+                } else {
+                    i--;
+                }
+                break;
+            case UP:
+                random_coordinate = rand() % width;
+                if (grid[1][random_coordinate] == 0) {
+                    grid[0][random_coordinate] = cell_value;
+                    positions[i * 2] = 0;
+                    positions[i * 2 + 1] = random_coordinate;
+                } else {
+                    i--;
+                }
+                break;
+            case DOWN:
+                random_coordinate = rand() % width;
+                if (grid[height - 2][random_coordinate] == 0) {
+                    grid[height - 1][random_coordinate] = cell_value;
+                    positions[i * 2] = height - 1;
+                    positions[i * 2 + 1] = random_coordinate;
+                } else {
+                    i--;
+                }
+                break;
         }
     }
 }

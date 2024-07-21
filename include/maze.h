@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #ifndef MAZE_H
 #define MAZE_H
 
@@ -7,31 +8,29 @@
 // 3 is an exit
 // 4 is a visited cell
 
+typedef enum { TOP, RIGHT, BOTTOM, LEFT } Directions;
+
 typedef struct node_t {
     int vertex;
-    int data;
     int row;
-    int column;
-    int parent;
+    int col;
+    bool walls[4];
+    bool visited;
+    bool searched;
     struct node_t *next;
 } node_t;
 
 typedef struct maze_t {
-    int width;
-    int height;
-    int size;
+    int rows;
+    int cols;
     int num_nodes;
     node_t **nodes;
-    int start;
-    int end;
-    int **grid;
+    size_t size;
 } maze_t;
 
-typedef enum { LEFT, RIGHT, UP, DOWN } Directions;
-
-int **create_grid(int height, int width);
-node_t *create_node(int vertex, int data, int row, int column);
-maze_t *create_maze(int width, int height, int **grid);
+node_t *create_node(int vertex, int data, int row, int col);
+maze_t *create_maze(int rows, int cols);
+void free_node(node_t *node);
 void free_maze(maze_t *maze);
 void add_edge(maze_t *maze, node_t *src, node_t *dest);
 void print_graph(maze_t *maze);
