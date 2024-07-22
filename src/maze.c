@@ -10,7 +10,7 @@
 
 #include "../include/maze.h"
 
-node_t *create_node(int vertex, int data, int row, int col) {
+node_t *create_node(int vertex, int row, int col) {
     node_t *new_node = (node_t *)malloc(sizeof(node_t));
 
     if (new_node == NULL) {
@@ -23,6 +23,8 @@ node_t *create_node(int vertex, int data, int row, int col) {
     new_node->vertex = vertex;
     new_node->row = row;
     new_node->col = col;
+
+    new_node->walls = (bool *)malloc(sizeof(bool *) * 4);
 
     // set default values for walls
     for (int i = 0; i < 4; i++) {
@@ -70,6 +72,7 @@ void free_node(node_t *node) {
     while (node != NULL) {
         node_t *tmp = node;
         node = node->next;
+        free(tmp->walls);
         free(tmp);
     }
 }

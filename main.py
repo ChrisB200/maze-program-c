@@ -1,6 +1,5 @@
 import pygame
 from pygame.locals import *
-import subprocess
 import sys
 import os
 import ctypes
@@ -16,6 +15,7 @@ WINDOW = pygame.display.set_mode((WIDTH, HEIGHT))
 
 generator_lib = load_shared_library("lib/maze-generator.so")
 solver_lib = load_shared_library("lib/maze-solver.so")
+DIRECTIONS = {"TOP": 0, "RIGHT": 1, "BOTTOM": 2, "LEFT": 3}
 
 
 class Node(ctypes.Structure):
@@ -24,24 +24,22 @@ class Node(ctypes.Structure):
 
 Node._fields_ = [
     ("vertex", ctypes.c_int),
-    ("data", ctypes.c_int),
     ("row", ctypes.c_int),
-    ("column", ctypes.c_int),
+    ("col", ctypes.c_int),
+    ("walls", ctypes.POINTER(ctypes.c_bool)),
+    ("visited", ctypes.c_bool),
+    ("searched", ctypes.c_bool),
     ("next", ctypes.POINTER(Node)),
-    ("parent", ctypes.c_int),
 ]
 
 
 class Maze(ctypes.Structure):
     _fields_ = [
-        ("width", ctypes.c_int),
-        ("height", ctypes.c_int),
-        ("size", ctypes.c_int),
+        ("rows", ctypes.c_int),
+        ("cols", ctypes.c_int),
         ("num_nodes", ctypes.c_int),
         ("nodes", ctypes.POINTER(ctypes.POINTER(Node))),
-        ("start", ctypes.c_int),
-        ("end", ctypes.c_int),
-        ("grid", ctypes.POINTER(ctypes.POINTER(ctypes.c_int))),
+        ("size", ctypes.c_size_t),
     ]
 
 
@@ -53,44 +51,48 @@ generator_lib.free_maze.argtypes = [ctypes.POINTER(Maze)]
 
 generator_lib.print_graph.argtypes = [ctypes.POINTER(Maze)]
 
-generator_lib.print_grid.argtypes = [ctypes.POINTER(Maze)]
-
 solver_lib.solve_maze.argtypes = [ctypes.POINTER(Maze)]
 
 
 class Grid:
-    def __init__(self, width, height, cell_size, filename="maze.txt"):
+    def __init__(self, rows, cols, node_size, line_size):
         self.transform = pygame.math.Vector2()
-        self.width = width
-        self.height = height
-        self.cell_size = cell_size
-        self.filename = filename
+        self.rows = rows
+        self.cols = cols
+        self.node_size = node_size
+        self.line_size = line_size
+
         self.maze = None
+        self.maze_surf = None
         self.maze_rects = []
         self.isDragging = False
         self.mousePositions = []
         self.zoom = 1
-        self.maze_surface = None
-        self.get_maze(width, height)
+        self.get_maze()
+
+    @property
+    def image(self):
+        if self.maze_surf:
+            return self.maze_surf.scale_by(self.maze_surf, (self.zoom, self.zoom))
 
     def cell_width(self):
-        return self.cell_size[0] * self.zoom
+        return self.node_size[0] * self.zoom
 
     def cell_height(self):
-        return self.cell_size[1] * self.zoom
+        return self.node_size[1] * self.zoom
 
-    def maze_width(self):
-        return self.cell_size[0] * self.width
+    def get_width(self):
+        return self.node_size[0] * self.cols
 
-    def maze_height(self):
-        return self.cell_size[1] * self.height
+    def get_height(self):
+        return self.node_size[1] * self.rows
 
     def rect(self):
         return pygame.Rect(
             self.transform.x,
             self.transform.y,
-            self.maze_width() * self.zoom,
-            self.maze_height() * self.zoom,
+            self.get_width() * self.zoom,
+            self.get_height() * self.zoom,
         )
 
     def event_handler(self, event):
@@ -107,7 +109,7 @@ class Grid:
             self.zoom += event.y * 0.1
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
-                self.get_maze(self.width, self.height)
+                self.get_maze()
             if event.key == pygame.K_RETURN:
                 self.solve_maze()
 
@@ -122,59 +124,72 @@ class Grid:
     def update(self):
         self.handle_dragging()
 
-    def get_maze(self, width, height):
-        self.width = width
-        self.height = height
+    def get_maze(self, **kwargs):
+        if kwargs.get("cols"):
+            self.cols = kwargs.get("cols")
+        if kwargs.get("rows"):
+            self.rows = kwargs.get("rows")
 
         if self.maze:
             generator_lib.free_maze(self.maze)
 
-        self.maze = generator_lib.generate_maze(self.width, self.height)
-        print("test")
+        self.maze = generator_lib.generate_maze(self.cols, self.rows)
         self.generate_rects()
-        print("generated")
 
     def generate_rects(self):
         self.maze_rects = []
 
-        for i in range(self.maze.contents.height):
-            row = self.maze.contents.grid[i]
-            for j in range(self.maze.contents.width):
-                cell = row[j]
-                cell_rect = pygame.Rect(
-                    i * self.cell_size[0],
-                    j * self.cell_size[1],
-                    self.cell_size[0],
-                    self.cell_size[1],
-                )
-                self.maze_rects.append((cell_rect, cell))
+        for i in range(self.maze.contents.num_nodes):
+            node = self.maze.contents.nodes[i]
+            print(node.contents.vertex)
+            cell_rect = pygame.Rect(
+                node.contents.col * self.node_size[0] + self.line_size,
+                node.contents.row * self.node_size[1] + self.line_size,
+                self.node_size[0],
+                self.node_size[1],
+            )
+            self.maze_rects.append((cell_rect, node))
 
-        self.maze_surface = pygame.Surface((self.maze_width(), self.maze_height()))
-        self.draw_rects(self.maze_surface)
+        self.maze_surf = pygame.Surface(
+            (self.get_width() + self.line_size * 2, self.get_height() + self.line_size * 2)
+        )
+        self.draw_rects(self.maze_surf)
 
     def draw_rects(self, surface):
         for cell in self.maze_rects:
-            match cell[1]:
-                case 0:
-                    pygame.draw.rect(surface, (200, 200, 200), cell[0])
-                case 1:
-                    pygame.draw.rect(surface, (0, 0, 0), cell[0])
-                case 2:
-                    pygame.draw.rect(surface, (0, 255, 0), cell[0])
-                case 3:
-                    pygame.draw.rect(surface, (255, 0, 0), cell[0])
-                case 4:
-                    pygame.draw.rect(surface, (255, 255, 0), cell[0])
-                case 5:
-                    pygame.draw.rect(surface, (0, 255, 255), cell[0])
+            rect = cell[0]
+            node = cell[1].contents
+            pygame.draw.rect(surface, (200, 200, 200), rect)
+
+            # draw the walls around the cell
+            if node.walls[DIRECTIONS["TOP"]]:
+                pygame.draw.line(
+                    surface, (0, 0, 0), rect.topleft, rect.topright, self.line_size
+                )
+            if node.walls[DIRECTIONS["RIGHT"]]:
+                pygame.draw.line(
+                    surface, (0, 0, 0), rect.topright, rect.bottomright, self.line_size
+                )
+            if node.walls[DIRECTIONS["BOTTOM"]]:
+                pygame.draw.line(
+                    surface,
+                    (0, 0, 0),
+                    rect.bottomleft,
+                    rect.bottomright,
+                    self.line_size,
+                )
+            if node.walls[DIRECTIONS["LEFT"]]:
+                pygame.draw.line(
+                    surface, (0, 0, 0), rect.topleft, rect.bottomleft, self.line_size
+                )
 
     def draw(self):
-        if self.maze_surface is None:
-            self.maze_surface = pygame.Surface((self.maze_width(), self.maze_height()))
-            self.draw_rects(self.maze_surface)
+        if self.maze_surf is None:
+            self.maze_surf = pygame.Surface((self.get_width(), self.get_height()))
+            self.draw_rects(self.maze_surf)
 
         WINDOW.blit(
-            pygame.transform.scale_by(self.maze_surface, (self.zoom, self.zoom)),
+            pygame.transform.scale_by(self.maze_surf, (self.zoom, self.zoom)),
             self.transform,
         )
 
@@ -202,7 +217,7 @@ def main():
 
     clock = pygame.time.Clock()
 
-    grid = Grid(21, 21, (20, 20))
+    grid = Grid(21, 21, (20, 20), 3)
 
     while run:
         clock.tick(60)
