@@ -12,6 +12,8 @@ typedef struct node_t {
     bool *walls;
     bool visited;
     bool searched;
+    bool path;
+    int parent;
     struct node_t *next;
 } node_t;
 

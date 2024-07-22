@@ -32,7 +32,9 @@ node_t *create_node(int vertex, int row, int col) {
     }
     new_node->visited = false;
     new_node->searched = false;
+    new_node->path = false;
     new_node->next = NULL;
+    new_node->parent = -1;
 
     return new_node;
 }
@@ -74,6 +76,7 @@ void free_node(node_t *node) {
         node = node->next;
         free(tmp->walls);
         free(tmp);
+        tmp = NULL;
     }
 }
 
@@ -87,7 +90,29 @@ void free_maze(maze_t *maze) {
     free(maze);
 }
 
-void add_edge(maze_t *maze, node_t *src, node_t *dest) {}
+node_t *copy_node(node_t *src) {
+    node_t *new_node = create_node(src->vertex, src->row, src->col);
+    new_node->visited = src->visited;
+    new_node->searched = src->searched;
+    // Deep copy the walls array
+    memcpy(new_node->walls, src->walls, sizeof(bool) * 4);
+    return new_node;
+}
+
+void add_edge(maze_t *maze, node_t *src, node_t *dest) {
+    node_t *curr = src;
+    node_t *tmp;
+    while (true) {
+        if (curr == NULL) {
+            break;
+        }
+        tmp = curr;
+        curr = curr->next;
+    }
+    
+    node_t *dest_copy = copy_node(dest);
+    tmp->next = dest_copy;
+}
 
 void print_graph(maze_t *maze) {
     for (int i = 0; i < maze->num_nodes; i++) {
@@ -106,7 +131,7 @@ void print_graph(maze_t *maze) {
 }
 
 node_t *check_cell(maze_t *maze, int row, int col) {
-    if (row <= 0 || row >= maze->rows || col <= 0 || col >= maze->cols) {
+    if (row < 0 || row >= maze->rows || col < 0 || col >= maze->cols) {
         return NULL;
     }
     int index = col + row * maze->cols;

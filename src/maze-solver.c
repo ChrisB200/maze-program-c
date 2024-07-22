@@ -15,8 +15,8 @@ void randomise_directions(Directions directions[]) {
 }
 
 void shortest_path(maze_t *maze) {
-    node_t *entrance = maze->nodes[maze->start];
-    node_t *exit = maze->nodes[maze->end];
+    node_t *entrance = maze->nodes[0];
+    node_t *exit = maze->nodes[maze->num_nodes-1];
     node_t *curr = exit;
 
     while (true) {
@@ -32,18 +32,9 @@ void shortest_path(maze_t *maze) {
             break;
         }
 
-        curr->data = 5;
-        maze->grid[curr->row][curr->column] = 5;
+        curr->path = true;
         curr = maze->nodes[curr->parent];
     }
-}
-
-void redraw_entrances(maze_t *maze) {
-    node_t *entrance = maze->nodes[maze->start];
-    node_t *exit = maze->nodes[maze->end];
-
-    maze->grid[entrance->row][entrance->column] = 2;
-    maze->grid[exit->row][exit->column] = 3;
 }
 
 void bfs(maze_t *maze, int entrance, int exit) {
@@ -64,14 +55,9 @@ void bfs(maze_t *maze, int entrance, int exit) {
     rear++;
     queue[rear] = entrance;
     visited[entrance] = true;
+    maze->nodes[entrance]->path = true;
 
     while (front <= rear) {
-        printf("\nfront: %d, rear: %d", front, rear);
-        printf("\n");
-        for (int i = front; i < rear; i++) {
-            printf("%d ", queue[i]);
-        }
-        printf("\n");
         // get vertex from queue
         int vertex = queue[front];
         node_t *curr = maze->nodes[vertex];
@@ -84,14 +70,13 @@ void bfs(maze_t *maze, int entrance, int exit) {
         // add all adjacent vertices to queue
         curr = maze->nodes[vertex];
         while (curr != NULL) {
-            printf("\nadjacent");
             if (visited[curr->vertex] == false) {
                 // add adjacent vertex to queue
                 rear++;
                 queue[rear] = curr->vertex;
                 visited[curr->vertex] = true;
-                maze->grid[curr->row][curr->column] = 4;
                 maze->nodes[curr->vertex]->parent = vertex;
+                maze->nodes[curr->vertex]->searched = true;
             }
             curr = curr->next;
         }
@@ -101,5 +86,4 @@ void bfs(maze_t *maze, int entrance, int exit) {
 
 void solve_maze(maze_t *maze) {
     bfs(maze, 0, maze->num_nodes-1);
-    redraw_entrances(maze);
 }
