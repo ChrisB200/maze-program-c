@@ -104,3 +104,12 @@ void print_graph(maze_t *maze) {
         printf("NULL");
     }
 }
+
+node_t *check_cell(maze_t *maze, int row, int col) {
+    if (row <= 0 || row >= maze->rows || col <= 0 || col >= maze->cols) {
+        return NULL;
+    }
+    int index = col + row * maze->cols;
+    node_t *tmp = maze->nodes[index];
+    return tmp;
+}
