@@ -55,12 +55,22 @@ solver_lib.solve_maze.argtypes = [ctypes.POINTER(Maze)]
 
 
 class Grid:
-    def __init__(self, rows, cols, node_size, line_size):
+    def __init__(
+        self,
+        rows,
+        cols,
+        node_size,
+        line_size,
+        bg_colour=(255, 255, 255),
+        line_colour=(0, 0, 0),
+    ):
         self.transform = pygame.math.Vector2()
         self.rows = rows
         self.cols = cols
         self.node_size = node_size
         self.line_size = line_size
+        self.bg_color = bg_colour
+        self.line_color = line_colour
 
         self.maze = None
         self.maze_surf = None
@@ -141,7 +151,6 @@ class Grid:
 
         for i in range(self.maze.contents.num_nodes):
             node = self.maze.contents.nodes[i]
-            print(node.contents.vertex)
             cell_rect = pygame.Rect(
                 node.contents.col * self.node_size[0] + self.line_size,
                 node.contents.row * self.node_size[1] + self.line_size,
@@ -151,7 +160,10 @@ class Grid:
             self.maze_rects.append((cell_rect, node))
 
         self.maze_surf = pygame.Surface(
-            (self.get_width() + self.line_size * 2, self.get_height() + self.line_size * 2)
+            (
+                self.get_width() + self.line_size * 2,
+                self.get_height() + self.line_size * 2,
+            )
         )
         self.draw_rects(self.maze_surf)
 
@@ -159,28 +171,28 @@ class Grid:
         for cell in self.maze_rects:
             rect = cell[0]
             node = cell[1].contents
-            pygame.draw.rect(surface, (200, 200, 200), rect)
+            pygame.draw.rect(surface, self.bg_color, rect)
 
             # draw the walls around the cell
             if node.walls[DIRECTIONS["TOP"]]:
                 pygame.draw.line(
-                    surface, (0, 0, 0), rect.topleft, rect.topright, self.line_size
+                    surface, self.line_color, rect.topleft, rect.topright, self.line_size
                 )
             if node.walls[DIRECTIONS["RIGHT"]]:
                 pygame.draw.line(
-                    surface, (0, 0, 0), rect.topright, rect.bottomright, self.line_size
+                    surface, self.line_color, rect.topright, rect.bottomright, self.line_size
                 )
             if node.walls[DIRECTIONS["BOTTOM"]]:
                 pygame.draw.line(
                     surface,
-                    (0, 0, 0),
+                    self.line_color,
                     rect.bottomleft,
                     rect.bottomright,
                     self.line_size,
                 )
             if node.walls[DIRECTIONS["LEFT"]]:
                 pygame.draw.line(
-                    surface, (0, 0, 0), rect.topleft, rect.bottomleft, self.line_size
+                    surface, self.line_color, rect.topleft, rect.bottomleft, self.line_size
                 )
 
     def draw(self):
@@ -217,7 +229,7 @@ def main():
 
     clock = pygame.time.Clock()
 
-    grid = Grid(21, 21, (20, 20), 3)
+    grid = Grid(20, 20, (20, 20), 3)
 
     while run:
         clock.tick(60)

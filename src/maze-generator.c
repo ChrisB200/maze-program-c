@@ -27,7 +27,6 @@ maze_t *generate_maze(int rows, int cols) {
         for (int j = 0; j < maze->cols; j++) {
             curr = create_node(count, i, j);
             maze->nodes[count] = curr;
-            printf("\n%d", maze->nodes[count]->vertex);
             count++;
         }
     }
