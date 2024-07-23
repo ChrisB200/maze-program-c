@@ -5,6 +5,49 @@
 #include <string.h>
 #include <time.h>
 
+typedef struct {
+    int max_size;
+    int start;
+    int end;
+    int rear;
+    int front;
+    bool *visited;
+    int *queue;
+} bfs_info;
+
+bfs_info *create_bfs_info(maze_t *maze, int start, int end) {
+    bfs_info *info = (bfs_info *)malloc(sizeof(bfs_info));
+
+    info->max_size = maze->num_nodes;
+    info->start = start;
+    info->end = end;
+    info->rear = -1;
+    info->front = 0;
+
+    info->visited = (bool *)malloc(sizeof(bool) * info->max_size);
+    for (int i = 0; i < info->max_size; i++) {
+        info->visited[i] = false;
+    }
+
+    info->queue = (int *)malloc(sizeof(int) * info->max_size);
+    for (int i = 0; i < info->max_size; i++) {
+        info->queue[i] = 0;
+    }
+
+   // add entrance vertex into queue
+    info->queue[info->rear++] = start;
+    info->visited[start] = true;
+    maze->nodes[start]->path = true;
+
+    return info;
+}
+
+void free_bfs_info(bfs_info *info) {
+    free(info->visited);
+    free(info->queue);
+    free(info);
+}
+
 void randomise_directions(Directions directions[]) {
     for (int i = 0; i < 4; i++) {
         int j = rand() % 4;
@@ -35,6 +78,10 @@ void shortest_path(maze_t *maze) {
         curr->path = true;
         curr = maze->nodes[curr->parent];
     }
+}
+
+bool bfs_step(maze_t *maze, bfs_info *info) {
+
 }
 
 void bfs(maze_t *maze, int entrance, int exit) {

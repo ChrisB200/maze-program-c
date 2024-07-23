@@ -249,7 +249,7 @@ def main():
 
     run = True
 
-    grid = Grid(40, 40, (60, 60), 10)
+    grid = Grid(20, 20, (60, 60), 10)
 
     while run:
         for event in pygame.event.get():
