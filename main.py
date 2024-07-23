@@ -17,6 +17,8 @@ generator_lib = load_shared_library("lib/maze-generator.so")
 solver_lib = load_shared_library("lib/maze-solver.so")
 DIRECTIONS = {"TOP": 0, "RIGHT": 1, "BOTTOM": 2, "LEFT": 3}
 
+DRAW_RECT = pygame.USEREVENT + 1
+
 
 class Node(ctypes.Structure):
     pass
@@ -45,6 +47,19 @@ class Maze(ctypes.Structure):
     ]
 
 
+class BfsInfo(ctypes.Structure):
+    _fields_ = [
+        ("max_size", ctypes.c_int),
+        ("start", ctypes.c_int),
+        ("end", ctypes.c_int),
+        ("rear", ctypes.c_int),
+        ("front", ctypes.c_int),
+        ("solved", ctypes.c_bool),
+        ("visited", ctypes.POINTER(ctypes.c_bool)),
+        ("queue", ctypes.POINTER(ctypes.c_int)),
+    ]
+
+
 # function prototypes
 generator_lib.generate_maze.argtypes = [ctypes.c_int, ctypes.c_int]
 generator_lib.generate_maze.restype = ctypes.POINTER(Maze)
@@ -54,6 +69,15 @@ generator_lib.free_maze.argtypes = [ctypes.POINTER(Maze)]
 generator_lib.print_graph.argtypes = [ctypes.POINTER(Maze)]
 
 solver_lib.solve_maze.argtypes = [ctypes.POINTER(Maze)]
+
+solver_lib.create_bfs_info.argtypes = [ctypes.POINTER(Maze), ctypes.c_int, ctypes.c_int]
+solver_lib.create_bfs_info.restype = ctypes.POINTER(BfsInfo)
+
+solver_lib.free_bfs_info.argtypes = [ctypes.POINTER(BfsInfo)]
+
+solver_lib.shortest_path.argtypes = [ctypes.POINTER(Maze)]
+
+solver_lib.bfs_step.argtypes = [ctypes.POINTER(Maze), ctypes.POINTER(BfsInfo)]
 
 
 class Grid:
@@ -80,6 +104,8 @@ class Grid:
         self.isDragging = False
         self.mousePositions = []
         self.zoom = 1
+        self.bfs_info = None
+        self.isSolving = False
         self.get_maze()
 
     @property
@@ -108,6 +134,8 @@ class Grid:
         )
 
     def event_handler(self, event):
+        if event.type == DRAW_RECT:
+            self.bfs_step()
         if event.type == pygame.MOUSEBUTTONDOWN:
             mouse = pygame.math.Vector2(pygame.mouse.get_pos())
             if event.button == 1 and self.rect().collidepoint(mouse):
@@ -123,7 +151,9 @@ class Grid:
             if event.key == pygame.K_SPACE:
                 self.get_maze()
             if event.key == pygame.K_RETURN:
-                self.solve_maze()
+                if not self.isSolving:
+                    self.isSolving = True
+                    pygame.time.set_timer(pygame.event.Event(DRAW_RECT), 20)
 
     def handle_dragging(self):
         if self.isDragging:
@@ -132,6 +162,7 @@ class Grid:
                 self.transform += change
             mouse = pygame.math.Vector2(pygame.mouse.get_pos())
             self.mousePositions.append(mouse)
+
 
     def update(self):
         self.handle_dragging()
@@ -144,6 +175,10 @@ class Grid:
 
         if self.maze:
             generator_lib.free_maze(self.maze)
+
+        if self.bfs_info:
+            solver_lib.free_bfs_info(self.bfs_info)
+            self.bfs_info = None
 
         self.maze = generator_lib.generate_maze(self.cols, self.rows)
         self.generate_rects()
@@ -227,10 +262,15 @@ class Grid:
             self.transform,
         )
 
-    def solve_maze(self):
-        if self.maze:
-            solver_lib.solve_maze(self.maze)
-        self.generate_rects()
+    def bfs_step(self):
+        if not self.bfs_info:
+            self.bfs_info = solver_lib.create_bfs_info(self.maze, 0, (self.cols * self.rows) - 1)
+
+        solver_lib.bfs_step(self.maze, self.bfs_info)
+        if self.bfs_info.contents.solved:
+            solver_lib.shortest_path(self.maze)
+
+        self.draw_rects(self.maze_surf)
 
 
 def draw(grid):

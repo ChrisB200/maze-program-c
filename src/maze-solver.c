@@ -11,6 +11,7 @@ typedef struct {
     int end;
     int rear;
     int front;
+    bool solved;
     bool *visited;
     int *queue;
 } bfs_info;
@@ -23,6 +24,7 @@ bfs_info *create_bfs_info(maze_t *maze, int start, int end) {
     info->end = end;
     info->rear = -1;
     info->front = 0;
+    info->solved = false;
 
     info->visited = (bool *)malloc(sizeof(bool) * info->max_size);
     for (int i = 0; i < info->max_size; i++) {
@@ -34,8 +36,9 @@ bfs_info *create_bfs_info(maze_t *maze, int start, int end) {
         info->queue[i] = 0;
     }
 
-   // add entrance vertex into queue
-    info->queue[info->rear++] = start;
+    // add entrance vertex into queue
+    info->rear++;
+    info->queue[info->rear] = start;
     info->visited[start] = true;
     maze->nodes[start]->path = true;
 
@@ -80,11 +83,37 @@ void shortest_path(maze_t *maze) {
     }
 }
 
-bool bfs_step(maze_t *maze, bfs_info *info) {
+void bfs_step(maze_t *maze, bfs_info *info) {
+    if (info->solved) {
+        return;
+    }
+    // get vertex from queue
+    int vertex = info->queue[info->front];
+    node_t *curr = maze->nodes[vertex];
+    info->front++;
 
+    // check if the vertex is the exit
+    if (vertex == info->end) {
+        info->solved = true;
+        return;
+    }
+
+    // add all adjacent vertices to queue
+    curr = maze->nodes[vertex];
+    while (curr != NULL) {
+        if (info->visited[curr->vertex] == false) {
+            // add adjacent vertex to queue
+            info->rear++;
+            info->queue[info->rear] = curr->vertex;
+            info->visited[curr->vertex] = true;
+            maze->nodes[curr->vertex]->parent = vertex;
+            maze->nodes[curr->vertex]->searched = true;
+        }
+        curr = curr->next;
+    }
 }
 
-void bfs(maze_t *maze, int entrance, int exit) {
+void instant_bfs(maze_t *maze, int entrance, int exit) {
     int max_size = maze->num_nodes;
     bool visited[max_size];
 
@@ -132,5 +161,5 @@ void bfs(maze_t *maze, int entrance, int exit) {
 }
 
 void solve_maze(maze_t *maze) {
-    bfs(maze, 0, maze->num_nodes-1);
+    instant_bfs(maze, 0, maze->num_nodes-1);
 }
