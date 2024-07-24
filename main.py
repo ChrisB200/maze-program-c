@@ -78,6 +78,7 @@ solver_lib.free_bfs_info.argtypes = [ctypes.POINTER(BfsInfo)]
 solver_lib.shortest_path.argtypes = [ctypes.POINTER(Maze)]
 
 solver_lib.bfs_step.argtypes = [ctypes.POINTER(Maze), ctypes.POINTER(BfsInfo)]
+solver_lib.bfs_step.restypes = ctypes.c_int
 
 
 class Grid:
@@ -98,32 +99,48 @@ class Grid:
         self.bg_color = bg_colour
         self.line_color = line_colour
 
+        # c maze info
         self.maze = None
-        self.maze_surf = None
-        self.maze_rects = []
-        self.isDragging = False
-        self.mousePositions = []
-        self.zoom = 1
         self.bfs_info = None
+
+        # cells
+        self.maze_surf = pygame.Surface(self.get_size())
+        self.maze_cells = []
         self.isSolving = False
+        self.speed = 1
+
+        # movement
+        self.zoom = 1
+        self.zoom_increment = 0
+        self.mousePositions = []
+        self.isDragging = False
+
         self.get_maze()
 
     @property
     def image(self):
-        if self.maze_surf:
-            return self.maze_surf.scale_by(self.maze_surf, (self.zoom, self.zoom))
+        return pygame.transform.scale(
+            self.maze_surf,
+            (
+                self.get_width() + self.zoom_increment,
+                self.get_height() + self.zoom_increment,
+            ),
+        )
 
     def cell_width(self):
-        return self.node_size[0] * self.zoom
+        return self.node_size[0] + self.zoom_increment
 
     def cell_height(self):
-        return self.node_size[1] * self.zoom
+        return self.node_size[1] + self.zoom_increment
 
     def get_width(self):
-        return self.node_size[0] * self.cols
+        return (self.node_size[0] * self.cols) + self.line_size
 
     def get_height(self):
-        return self.node_size[1] * self.rows
+        return (self.node_size[1] * self.rows) + self.line_size
+
+    def get_size(self):
+        return self.get_width(), self.get_height()
 
     def rect(self):
         return pygame.Rect(
@@ -146,14 +163,17 @@ class Grid:
                 self.isDragging = False
                 self.mousePositions.clear()
         if event.type == pygame.MOUSEWHEEL:
-            self.zoom += event.y * 0.1
+            self.zoom_increment += event.y * 100
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 self.get_maze()
             if event.key == pygame.K_RETURN:
-                if not self.isSolving:
+                if self.isSolving:
+                    self.isSolving = False
+                    pygame.time.set_timer(pygame.event.Event(DRAW_RECT), 0)
+                else:
                     self.isSolving = True
-                    pygame.time.set_timer(pygame.event.Event(DRAW_RECT), 20)
+                    pygame.time.set_timer(pygame.event.Event(DRAW_RECT), self.speed)
 
     def handle_dragging(self):
         if self.isDragging:
@@ -163,16 +183,13 @@ class Grid:
             mouse = pygame.math.Vector2(pygame.mouse.get_pos())
             self.mousePositions.append(mouse)
 
-
     def update(self):
         self.handle_dragging()
 
-    def get_maze(self, **kwargs):
-        if kwargs.get("cols"):
-            self.cols = kwargs.get("cols")
-        if kwargs.get("rows"):
-            self.rows = kwargs.get("rows")
+        if not self.isSolving:
+            pygame.time.set_timer(pygame.event.Event(DRAW_RECT), 0)
 
+    def generate_maze(self):
         if self.maze:
             generator_lib.free_maze(self.maze)
 
@@ -181,10 +198,17 @@ class Grid:
             self.bfs_info = None
 
         self.maze = generator_lib.generate_maze(self.cols, self.rows)
-        self.generate_rects()
 
-    def generate_rects(self):
-        self.maze_rects = []
+    def get_maze(self, **kwargs):
+        if kwargs.get("cols"):
+            self.cols = kwargs.get("cols")
+        if kwargs.get("rows"):
+            self.rows = kwargs.get("rows")
+        self.generate_maze()
+        self.generate_cells()
+
+    def generate_cells(self):
+        self.maze_cells = []
 
         for i in range(self.maze.contents.num_nodes):
             node = self.maze.contents.nodes[i]
@@ -194,83 +218,88 @@ class Grid:
                 self.node_size[0],
                 self.node_size[1],
             )
-            self.maze_rects.append((cell_rect, node))
+            self.maze_cells.append((cell_rect, node))
 
-        self.maze_surf = pygame.Surface(
-            (
-                self.get_width() + self.line_size,
-                self.get_height() + self.line_size,
-            )
-        )
         self.maze_surf.fill((255, 255, 255))
-        self.draw_rects(self.maze_surf)
+        self.draw_rects()
 
-    def draw_rects(self, surface):
-        for cell in self.maze_rects:
-            rect = cell[0]
-            node = cell[1].contents
+    def draw_wall(self, node, rect):
+        # draw the walls around the cell
+        if node.walls[DIRECTIONS["TOP"]]:
+            pygame.draw.line(
+                self.maze_surf,
+                self.line_color,
+                rect.topleft,
+                rect.topright,
+                self.line_size,
+            )
+        if node.walls[DIRECTIONS["RIGHT"]]:
+            pygame.draw.line(
+                self.maze_surf,
+                self.line_color,
+                rect.topright,
+                rect.bottomright,
+                self.line_size,
+            )
+        if node.walls[DIRECTIONS["BOTTOM"]]:
+            pygame.draw.line(
+                self.maze_surf,
+                self.line_color,
+                rect.bottomleft,
+                rect.bottomright,
+                self.line_size,
+            )
+        if node.walls[DIRECTIONS["LEFT"]]:
+            pygame.draw.line(
+                self.maze_surf,
+                self.line_color,
+                rect.topleft,
+                rect.bottomleft,
+                self.line_size,
+            )
 
-            if node.path:
-                pygame.draw.rect(surface, (0, 255, 255), rect)
-            elif node.searched:
-                pygame.draw.rect(surface, (255, 255, 0), rect)
-            else:
-                pygame.draw.rect(surface, self.bg_color, rect)
+    def draw_rect(self, node):
+        node = node.contents
+        rect = self.maze_cells[node.vertex][0]
+        if node.path:
+            pygame.draw.rect(self.maze_surf, (0, 255, 255), rect)
+        elif node.searched:
+            pygame.draw.rect(self.maze_surf, (255, 255, 0), rect)
+        else:
+            pygame.draw.rect(self.maze_surf, self.bg_color, rect)
+        self.draw_wall(node, rect)
 
-            # draw the walls around the cell
-            if node.walls[DIRECTIONS["TOP"]]:
-                pygame.draw.line(
-                    surface,
-                    self.line_color,
-                    rect.topleft,
-                    rect.topright,
-                    self.line_size,
-                )
-            if node.walls[DIRECTIONS["RIGHT"]]:
-                pygame.draw.line(
-                    surface,
-                    self.line_color,
-                    rect.topright,
-                    rect.bottomright,
-                    self.line_size,
-                )
-            if node.walls[DIRECTIONS["BOTTOM"]]:
-                pygame.draw.line(
-                    surface,
-                    self.line_color,
-                    rect.bottomleft,
-                    rect.bottomright,
-                    self.line_size,
-                )
-            if node.walls[DIRECTIONS["LEFT"]]:
-                pygame.draw.line(
-                    surface,
-                    self.line_color,
-                    rect.topleft,
-                    rect.bottomleft,
-                    self.line_size,
-                )
+    def draw_rects(self):
+        for cell in self.maze_cells:
+            self.draw_rect(cell[1])
 
     def draw(self):
-        if self.maze_surf is None:
-            self.maze_surf = pygame.Surface((self.get_width(), self.get_height()))
-            self.maze_surf.fill(255, 255, 255)
-            self.draw_rects(self.maze_surf)
+        WINDOW.blit(self.image, self.transform)
 
-        WINDOW.blit(
-            pygame.transform.scale_by(self.maze_surf, (self.zoom, self.zoom)),
-            self.transform,
-        )
+    def show_solved(self, vertex):
+        node = vertex
+        while node.contents.parent != -1:
+            self.draw_rect(node)
+            node = self.maze.contents.nodes[node.contents.parent]
 
     def bfs_step(self):
         if not self.bfs_info:
-            self.bfs_info = solver_lib.create_bfs_info(self.maze, 0, (self.cols * self.rows) - 1)
+            self.bfs_info = solver_lib.create_bfs_info(
+                self.maze, 0, (self.cols * self.rows) - 1
+            )
 
-        solver_lib.bfs_step(self.maze, self.bfs_info)
+        step = solver_lib.bfs_step(self.maze, self.bfs_info)
         if self.bfs_info.contents.solved:
             solver_lib.shortest_path(self.maze)
 
-        self.draw_rects(self.maze_surf)
+        bfs = self.bfs_info.contents
+        maze = self.maze.contents
+
+        if step != -1:
+            self.draw_rect(maze.nodes[step])
+        else:
+            self.show_solved(maze.nodes[self.rows * self.cols - 1])
+            self.isSolving = False
 
 
 def draw(grid):
@@ -289,7 +318,7 @@ def main():
 
     run = True
 
-    grid = Grid(20, 20, (60, 60), 10)
+    grid = Grid(50, 50, (60, 60), 10)
 
     while run:
         for event in pygame.event.get():

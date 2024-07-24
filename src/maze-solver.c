@@ -83,9 +83,9 @@ void shortest_path(maze_t *maze) {
     }
 }
 
-void bfs_step(maze_t *maze, bfs_info *info) {
+int bfs_step(maze_t *maze, bfs_info *info) {
     if (info->solved) {
-        return;
+        return -1;
     }
     // get vertex from queue
     int vertex = info->queue[info->front];
@@ -95,7 +95,7 @@ void bfs_step(maze_t *maze, bfs_info *info) {
     // check if the vertex is the exit
     if (vertex == info->end) {
         info->solved = true;
-        return;
+        return vertex;
     }
 
     // add all adjacent vertices to queue
@@ -111,6 +111,7 @@ void bfs_step(maze_t *maze, bfs_info *info) {
         }
         curr = curr->next;
     }
+    return vertex;
 }
 
 void instant_bfs(maze_t *maze, int entrance, int exit) {
