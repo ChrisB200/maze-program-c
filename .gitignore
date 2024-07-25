@@ -23,6 +23,7 @@ maze-generator
 # Temporary files
 *.tmp
 *.bak
+__pycache__
 
 # Dependency files
 *.d
