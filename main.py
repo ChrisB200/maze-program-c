@@ -302,32 +302,177 @@ class Grid:
             self.isSolving = False
 
 
-def draw(grid):
+class Sidebar:
+    def __init__(self, transform: tuple, size: tuple):
+        self.transform = pygame.math.Vector2(transform)
+        self.size = size
+        self.elements = []
+        self.visible = True
+        self.active = True
+
+    def add_element(self, *elements):
+        for element in elements:
+            self.elements.append(element)
+            element.parent = self
+
+    def remove_element(self, *elements):
+        for element in elements:
+            element.parent = None
+            self.elements.remove(element)
+
+    def set_visible(self, state: bool):
+        self.visible = state
+        for element in self.elements:
+            element.visible = state
+
+    def set_active(self, state: bool):
+        self.active = state
+        for element in self.elements:
+            element.active = state
+
+    def check_hover(self):
+        for element in self.elements:
+            if element.isHover:
+                return element
+        return None
+
+    def update(self):
+        for element in self.elements:
+            element.update()
+
+    def event_handler(self, event):
+        for element in sorted(self.elements, key=lambda element: element.layer):
+            element.event_handler(event)
+
+    def draw(self, surface):
+        for element in sorted(self.elements, key=lambda element: element.layer):
+            element.draw(surface)
+
+
+class Element:
+    def __init__(self, transform: tuple, size: list, callback=None):
+        self.local_transform = pygame.math.Vector2(transform)
+        self.size = size
+        self.visible = True
+        self.active = True
+        self.surf = pygame.Surface(size)
+        self.isHover = False
+        self.callback = callback
+        self.parent = None
+        self.layer = 0
+
+    @property
+    def transform(self):
+        return (
+            self.local_transform + self.parent.transform
+            if self.parent
+            else self.local_transform
+        )
+
+    def get_rect(self):
+        return pygame.Rect(
+            self.transform.x, self.transform.y, self.size[0], self.size[1]
+        )
+
+    def draw(self, surface):
+        surface.blit(self.surf, self.transform)
+
+    def check_hover(self):
+        if self.get_rect().collidepoint(pygame.mouse.get_pos()) and self.active:
+            self.isHover = True
+        else:
+            self.isHover = False
+
+    def update(self):
+        self.check_hover()
+
+    def event_handler(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if self.isHover:
+                self.callback if self.callback else None
+
+
+class Text(Element):
+    def __init__(self, transform: tuple, text: str, font, colour=(0, 0, 0)):
+        super().__init__(transform, [0, 0], None)
+        self.text = text
+        self.font = font
+        self.colour = colour
+        self.antialias = True
+        self.update_surf()
+
+    def update_surf(self):
+        self.surf = self.font.render(str(self.text), self.antialias, self.colour)
+        self.size[0] = self.surf.get_width()
+        self.size[1] = self.surf.get_height()
+
+    def change_aliasing(self, state):
+        self.antialias = state
+        self.update_surf()
+
+    def change_text(self, text):
+        self.text = text
+        self.update_surf()
+
+    def change_colour(self, colour):
+        self.colour = colour
+        self.update_surf()
+
+
+def draw(grid, sidebar):
     WINDOW.fill((255, 255, 255))
     grid.draw()
+    sidebar.draw(WINDOW)
     pygame.display.update()
 
 
-def update(grid):
+def update(grid, sidebar):
     grid.update()
+    sidebar.update()
+    check_hover(grid, sidebar)
+
+
+def check_hover(grid, sidebar):
+    temp_cursor = False
+    if sidebar.check_hover():
+        temp_cursor = True
+    cursor = temp_cursor
+
+    if not cursor:
+        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+    else:
+        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
 
 
 def main():
+    global cursor
     pygame.init()
     pygame.font.init()
 
     run = True
+    cursor = False
 
     grid = Grid(50, 50, (60, 60), 10)
+    sidebar = Sidebar((1200, 0), (200, 800))
+
+    bg = Element((0, 0), (300, 800))
+    bg.active = False
+    bg.surf.fill((255, 253, 208))
+
+    test = Text((0, 0), "Hey", pygame.font.SysFont("calibri", 24))
+    test.active = False
+    test.layer = 2
+    sidebar.add_element(bg, test)
 
     while run:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
             grid.event_handler(event)
+            sidebar.event_handler(event)
 
-        draw(grid)
-        update(grid)
+        draw(grid, sidebar)
+        update(grid, sidebar)
 
     if grid.maze:
         generator_lib.free_maze(grid.maze)
