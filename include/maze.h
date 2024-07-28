@@ -32,5 +32,6 @@ void free_maze(maze_t *maze);
 void add_edge(maze_t *maze, node_t *src, node_t *dest);
 void print_graph(maze_t *maze);
 node_t *check_cell(maze_t *maze, int row, int col);
+void reset_node(node_t *node);
 
 #endif

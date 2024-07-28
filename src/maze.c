@@ -138,3 +138,9 @@ node_t *check_cell(maze_t *maze, int row, int col) {
     node_t *tmp = maze->nodes[index];
     return tmp;
 }
+
+void reset_node(node_t *node) {
+    node->path = false;
+    node->searched = false;
+    node->parent = -1;
+}

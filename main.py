@@ -69,6 +69,8 @@ generator_lib.free_maze.argtypes = [ctypes.POINTER(Maze)]
 
 generator_lib.print_graph.argtypes = [ctypes.POINTER(Maze)]
 
+generator_lib.reset_node.argtypes = [ctypes.POINTER(Node)]
+
 solver_lib.solve_maze.argtypes = [ctypes.POINTER(Maze)]
 
 solver_lib.create_bfs_info.argtypes = [ctypes.POINTER(Maze), ctypes.c_int, ctypes.c_int]
@@ -101,6 +103,10 @@ class Cell:
     @property
     def node(self):
         return self.maze.nodes[self.vertex].contents
+
+    @property
+    def node_pointer(self):
+        return self.maze.nodes[self.vertex]
 
     def draw_wall(self, surf):
         # draw the walls around the cell
@@ -179,6 +185,7 @@ class Grid:
         self.isSolving = False
         self.speed = 1
         self.hovered_cells = []
+        self.changed_cells = []
 
         self.get_maze()
 
@@ -234,7 +241,7 @@ class Grid:
                 return
 
             index = (row * self.rows) + col
-            if index >= self.rows*self.cols or index < 0:
+            if index >= self.rows * self.cols or index < 0:
                 for count, cell in enumerate(self.hovered_cells):
                     cell = self.cells[cell]
                     cell.draw(self.surf, hover=False)
@@ -251,7 +258,6 @@ class Grid:
                 cell = self.cells[cell]
                 cell.draw(self.surf, hover=False)
                 self.hovered_cells.pop(count)
-
 
     def event_handler(self, event):
         if event.type == DRAW_RECT:
@@ -270,6 +276,8 @@ class Grid:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 self.get_maze()
+            if event.key == pygame.K_q:
+                self.reset_cells()
             if event.key == pygame.K_RETURN:
                 if self.isSolving:
                     self.isSolving = False
@@ -353,11 +361,20 @@ class Grid:
             solver_lib.shortest_path(self.maze)
 
         if step != -1:
+            self.changed_cells.append(self.cells[step])
             self.cells[step].draw(self.surf)
         else:
-            cell = self.cells[self.rows * self.cols - 1]
+            cell = self.cells[self.bfs_info.contents.end]
             self.show_solved(cell)
             self.isSolving = False
+
+    def reset_cells(self):
+        while len(self.changed_cells) > 0:
+            for count, cell in enumerate(self.changed_cells):
+                generator_lib.reset_node(cell.node_pointer)
+                cell.draw(self.surf)
+                self.changed_cells.pop(count)
+        self.bfs_info = None
 
 
 def draw(grid, sidebar):
