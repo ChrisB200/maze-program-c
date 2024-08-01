@@ -1,9 +1,9 @@
 import pygame
-from pygame.locals import *
+import pygame_gui
 import sys
+import math
 import os
 import ctypes
-import scripts.user_interface as ui
 
 
 def load_shared_library(filename):
@@ -18,7 +18,17 @@ generator_lib = load_shared_library("lib/maze-generator.so")
 solver_lib = load_shared_library("lib/maze-solver.so")
 DIRECTIONS = {"TOP": 0, "RIGHT": 1, "BOTTOM": 2, "LEFT": 3}
 
-DRAW_RECT = pygame.USEREVENT + 1
+DRAW_RECT = pygame.USEREVENT + 9999
+
+# Preload the necessary fonts
+fonts_to_preload = [
+    {'name': 'noto_sans', 'point_size': 12, 'style': 'regular', 'antialiased': True},
+    {'name': 'noto_sans', 'point_size': 18, 'style': 'regular', 'antialiased': True},
+    {'name': 'noto_sans', 'point_size': 24, 'style': 'regular', 'antialiased': True},
+    {'name': 'noto_sans', 'point_size': 36, 'style': 'regular', 'antialiased': True},
+    {'name': 'noto_sans', 'point_size': 48, 'style': 'regular', 'antialiased': True},
+    {'name': 'noto_sans', 'point_size': 64, 'style': 'regular', 'antialiased': True},
+]
 
 
 class Node(ctypes.Structure):
@@ -91,10 +101,14 @@ class Cell:
         self.grid = grid
         self.line_size = line_size
         self.bg_color = (255, 255, 255)
-        self.search_color = (255, 255, 0)
-        self.path_color = (0, 255, 255)
-        self.hover_color = (0, 255, 0)
+        self.start_color = pygame.Color(122, 77, 159)
+        self.end_color = pygame.Color(34, 35, 95)
+        self.hover_color = (200, 200, 200)
         self.line_color = (0, 0, 0)
+        self.search_color = pygame.Color(168, 218, 205)
+        self.path_color = pygame.Color(235, 104, 160)
+
+        self.state = "bg"
 
     @property
     def maze(self):
@@ -143,41 +157,43 @@ class Cell:
                 self.line_size,
             )
 
+    def set_state(self, state, surf):
+        self.state = state
+        self.draw(surf)
+
     def draw(self, surf, hover=False):
         if hover:
             pygame.draw.rect(surf, self.hover_color, self.rect)
-        elif self.node.path:
+        elif self.state == "start":
+            pygame.draw.rect(surf, self.start_color, self.rect)
+        elif self.state == "end":
+            pygame.draw.rect(surf, self.end_color, self.rect)
+        elif self.state == "path":
             pygame.draw.rect(surf, self.path_color, self.rect)
-        elif self.node.searched:
+        elif self.state == "search":
             pygame.draw.rect(surf, self.search_color, self.rect)
-        else:
+        elif self.state == "bg":
             pygame.draw.rect(surf, self.bg_color, self.rect)
         self.draw_wall(surf)
 
 
 class Grid:
-    def __init__(
-        self,
-        rows,
-        cols,
-        node_size,
-        line_size,
-    ):
+    def __init__(self, rows, cols, node_size):
         self.transform = pygame.math.Vector2()
         self.rows = rows
         self.cols = cols
         self.node_size = node_size
-        self.line_size = line_size
+        self.line_size = math.floor(self.node_size[0] * 0.1)
 
         # c maze info
         self.maze = None
         self.bfs_info = None
 
         # movement
-        self.zoom = 1
         self.zoom_increment = 0
         self.mousePositions = []
         self.isDragging = False
+        self.isHolding = False
 
         # cells
         self.surf = pygame.Surface(self.get_size())
@@ -186,6 +202,9 @@ class Grid:
         self.speed = 1
         self.hovered_cells = []
         self.changed_cells = []
+        self.start = None
+        self.end = None
+        self.bounds = pygame.math.Vector2(1200, 800)
 
         self.get_maze()
 
@@ -212,7 +231,7 @@ class Grid:
         return (self.cell_height() * self.rows) + self.line_size
 
     def get_size(self):
-        return self.get_width(), self.get_height()
+        return self.get_width() + 10, self.get_height() + 10
 
     def rect(self):
         return pygame.Rect(
@@ -244,47 +263,70 @@ class Grid:
             if index >= self.rows * self.cols or index < 0:
                 for count, cell in enumerate(self.hovered_cells):
                     cell = self.cells[cell]
-                    cell.draw(self.surf, hover=False)
+                    cell.set_state(cell.state, self.surf)
                     self.hovered_cells.pop(count)
             if index not in self.hovered_cells:
                 self.hovered_cells.append(index)
             if len(self.hovered_cells) == 2:
                 cell = self.cells[self.hovered_cells[0]]
-                cell.draw(self.surf, hover=False)
+                cell.set_state(cell.state, self.surf)
                 self.hovered_cells.pop(0)
             self.cells[index].draw(self.surf, hover=True)
         else:
             for count, cell in enumerate(self.hovered_cells):
                 cell = self.cells[cell]
-                cell.draw(self.surf, hover=False)
+                cell.set_state(cell.state, self.surf)
                 self.hovered_cells.pop(count)
+
+    def start_solving(self):
+        if self.isSolving:
+            self.isSolving = False
+            pygame.time.set_timer(pygame.event.Event(DRAW_RECT), 0)
+        else:
+            self.isSolving = True
+            pygame.time.set_timer(pygame.event.Event(DRAW_RECT), self.speed)
+
+    def check_sidebar(self, mouse):
+        if mouse.x >= 1200:
+            return False
+        return True
 
     def event_handler(self, event):
         if event.type == DRAW_RECT:
             self.bfs_step()
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_LSHIFT:
+                self.isHolding = True
+        if event.type == pygame.KEYUP:
+            if event.key == pygame.K_LSHIFT:
+                self.isHolding = False
+
         if event.type == pygame.MOUSEBUTTONDOWN:
             mouse = pygame.math.Vector2(pygame.mouse.get_pos())
-            if event.button == 1 and self.rect().collidepoint(mouse):
-                self.isDragging = True
-                self.mousePositions.append(mouse)
+            if self.check_sidebar(mouse):
+                if event.button == 1 and self.isHolding and self.rect().collidepoint(mouse):
+                    self.isDragging = True
+                    self.mousePositions.append(mouse)
         if event.type == pygame.MOUSEBUTTONUP:
-            if event.button == 1 and self.isDragging:
-                self.isDragging = False
-                self.mousePositions.clear()
+            mouse = pygame.math.Vector2(pygame.mouse.get_pos())
+            if self.check_sidebar(mouse):
+                if event.button == 1 and self.isDragging:
+                    self.isDragging = False
+                    self.mousePositions.clear()
+                if event.button == 1 and self.rect().collidepoint(mouse) and not self.isDragging and not self.isHolding:
+                    if self.start:
+                        self.reset_cells()
+                        self.cells[self.start].set_state("bg", self.surf)
+                    self.start = self.hovered_cells[-1]
+                    self.cells[self.start].set_state("start", self.surf)
+                if event.button == 3 and self.rect().collidepoint(mouse):
+                    if self.end:
+                        self.cells[self.end].set_state("bg", self.surf)
+
+                    self.end = self.hovered_cells[-1]
+                    self.cells[self.end].set_state("end", self.surf)
         if event.type == pygame.MOUSEWHEEL:
             self.zoom_increment += event.y * 5
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_SPACE:
-                self.get_maze()
-            if event.key == pygame.K_q:
-                self.reset_cells()
-            if event.key == pygame.K_RETURN:
-                if self.isSolving:
-                    self.isSolving = False
-                    pygame.time.set_timer(pygame.event.Event(DRAW_RECT), 0)
-                else:
-                    self.isSolving = True
-                    pygame.time.set_timer(pygame.event.Event(DRAW_RECT), self.speed)
 
     def handle_dragging(self):
         if self.isDragging:
@@ -304,6 +346,7 @@ class Grid:
     def generate_maze(self):
         if self.maze:
             generator_lib.free_maze(self.maze)
+            self.maze = None
 
         if self.bfs_info:
             solver_lib.free_bfs_info(self.bfs_info)
@@ -325,8 +368,8 @@ class Grid:
         for i in range(self.maze.contents.num_nodes):
             node = self.maze.contents.nodes[i]
             cell_rect = pygame.Rect(
-                node.contents.col * self.node_size[0] + 4,
-                node.contents.row * self.node_size[1] + 4,
+                node.contents.col * self.node_size[0] + self.line_size,
+                node.contents.row * self.node_size[1] + self.line_size,
                 self.node_size[0],
                 self.node_size[1],
             )
@@ -341,28 +384,30 @@ class Grid:
             cell.draw(self.surf)
 
     def draw(self):
-        pygame.draw.rect(WINDOW, (255, 0, 0), self.rect())
         WINDOW.blit(self.image, self.transform)
 
     def show_solved(self, cell):
         cell = cell
         while cell.node.parent != -1:
-            cell.draw(self.surf)
+            if cell.state != "start" or cell.state != "end":
+                cell.set_state("path", self.surf)
             cell = self.cells[cell.node.parent]
+        self.cells[self.start].set_state("start", self.surf)
+        self.cells[self.end].set_state("end", self.surf)
 
     def bfs_step(self):
         if not self.bfs_info:
-            self.bfs_info = solver_lib.create_bfs_info(
-                self.maze, 0, (self.cols * self.rows) - 1
-            )
+            self.bfs_info = solver_lib.create_bfs_info(self.maze, self.start, self.end)
 
         step = solver_lib.bfs_step(self.maze, self.bfs_info)
         if self.bfs_info.contents.solved:
             solver_lib.shortest_path(self.maze)
 
         if step != -1:
-            self.changed_cells.append(self.cells[step])
-            self.cells[step].draw(self.surf)
+            cell = self.cells[step]
+            self.changed_cells.append(cell)
+            if cell.state != "start" or cell.state != "end":
+                self.cells[step].set_state("search", self.surf)
         else:
             cell = self.cells[self.bfs_info.contents.end]
             self.show_solved(cell)
@@ -372,28 +417,28 @@ class Grid:
         while len(self.changed_cells) > 0:
             for count, cell in enumerate(self.changed_cells):
                 generator_lib.reset_node(cell.node_pointer)
-                cell.draw(self.surf)
+                cell.set_state("bg", self.surf)
                 self.changed_cells.pop(count)
+        if self.bfs_info:
+            solver_lib.free_bfs_info(self.bfs_info)
         self.bfs_info = None
 
 
-def draw(grid, sidebar):
+def draw(grid):
     WINDOW.fill((255, 255, 255))
     grid.draw()
-    sidebar.draw(WINDOW)
+    manager.draw_ui(WINDOW)
     pygame.display.update()
 
 
-def update(grid, sidebar):
+def update(grid):
     grid.update()
-    sidebar.update()
-    check_hover(grid, sidebar)
+    manager.update(dt)
+    check_hover(grid)
 
 
-def check_hover(grid, sidebar):
+def check_hover(grid):
     temp_cursor = False
-    if sidebar.check_hover():
-        temp_cursor = True
     if grid.rect().collidepoint(pygame.mouse.get_pos()):
         temp_cursor = True
     cursor = temp_cursor
@@ -406,37 +451,122 @@ def check_hover(grid, sidebar):
 
 def main():
     global cursor
+    global manager
+    global dt
     pygame.init()
     pygame.font.init()
 
     run = True
     cursor = False
 
-    grid = Grid(50, 50, (60, 60), 10)
-    sidebar = ui.Sidebar((1200, 0), (200, 800))
+    manager = pygame_gui.UIManager((WIDTH, HEIGHT))
+    manager.preload_fonts(fonts_to_preload)
 
-    bg = ui.Element((0, 0), (300, 800))
-    bg.active = False
-    bg.surf.fill((255, 253, 208))
+    grid = Grid(50, 50, (20, 20))
 
-    font = pygame.font.SysFont("calibri", 24)
-    test = ui.Text((0, 0), "Hey", font)
-    test.active = False
-    test.layer = 2
+    sidebar = pygame_gui.elements.UIPanel(
+        relative_rect=pygame.Rect(1200, 0, 300, 800),
+        manager=manager,
+        anchors={"centery": "centery"},
+    )
 
-    button = ui.Button((40, 40), (100, 40), "BUTTON", font)
-    button.change_layer(3)
-    sidebar.add_element(bg, test, button)
+    controls_btn = pygame_gui.elements.UIButton(
+        relative_rect=pygame.Rect(-1, 40, 200, 50),
+        text="Show Controls",
+        manager=manager,
+        container=sidebar,
+        anchors={"centerx": "centerx"},
+    )
+
+    row_lbl = pygame_gui.elements.UILabel(
+        relative_rect=pygame.Rect(-1, 80, -1, -1),
+        text="Rows & Columns: 50",
+        manager=manager,
+        container=sidebar,
+        anchors={"centerx": "centerx", "top_target": controls_btn},
+    )
+
+    row_slider = pygame_gui.elements.UIHorizontalSlider(
+        relative_rect=pygame.Rect(0, 20, 250, 30),
+        start_value=50,
+        value_range=(5, 100),
+        manager=manager,
+        container=sidebar,
+        anchors={"centerx": "centerx", "top_target": row_lbl},
+    )
+
+    generate_btn = pygame_gui.elements.UIButton(
+        relative_rect=pygame.Rect(-1, 40, 200, 50),
+        text="Generate Maze",
+        manager=manager,
+        container=sidebar,
+        anchors={"centerx": "centerx", "top_target": row_slider},
+    )
+
+    algorithm_dropdown = pygame_gui.elements.UIDropDownMenu(
+        relative_rect=pygame.Rect(-1, 80, 200, 40),
+        options_list=["Breadth-First", "Depth-First", "Djikstras", "A*"],
+        starting_option="Breadth-First",
+        manager=manager,
+        container=sidebar,
+        anchors={"centerx": "centerx", "top_target": generate_btn},
+    )
+
+    algorithm_btn = pygame_gui.elements.UIButton(
+        relative_rect=pygame.Rect(-1, 40, 200, 50),
+        text="Start Search",
+        manager=manager,
+        container=sidebar,
+        anchors={"centerx": "centerx", "top_target": algorithm_dropdown},
+    )
+
+    reset_btn = pygame_gui.elements.UIButton(
+        relative_rect=pygame.Rect(-1, 40, 200, 50),
+        text="Reset Colours",
+        manager=manager,
+        container=sidebar,
+        anchors={"centerx": "centerx", "top_target": algorithm_btn},
+    )
+
+    clock = pygame.time.Clock()
 
     while run:
+        dt = clock.tick() / 1000.0
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
-            grid.event_handler(event)
-            sidebar.event_handler(event)
+            if event.type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED:
+                if event.ui_element == row_slider:
+                    slider_value = row_slider.get_current_value()
+                    row_lbl.set_text(f"Rows & Columns: {slider_value}")
+            if event.type == pygame_gui.UI_BUTTON_PRESSED:
+                if event.ui_element == generate_btn:
+                    row_slider_value = row_slider.get_current_value()
+                    grid = Grid(row_slider_value, row_slider_value, (50, 50))
+                if event.ui_element == algorithm_btn:
+                    grid.start_solving()
+                if event.ui_element == reset_btn:
+                    grid.reset_cells()
+                if event.ui_element == controls_btn:
+                    controls_msg = pygame_gui.windows.UIMessageWindow(
+                        rect=pygame.Rect(-1, -1, 400, 300),
+                        html_message=(
+                            "<font size='+6'><p><u>Controls</u></p></font>"
+                            "<font size='+4'><p>Drag - Left Mouse Button + Left Shift</p></font>"
+                            "<font size='+4'><p>Place Starting Cell - Left Mouse Button</p></font>"
+                            "<font size='+4'><p>Place Ending Cell - Right Mouse Button</p></font>"
+                            "<font size='+4'><p>Scroll - Scroll Wheel</p></font>"
+                        ),
+                        manager=manager,
+                        window_title="Message",
+                    )
 
-        draw(grid, sidebar)
-        update(grid, sidebar)
+            manager.process_events(event)
+            grid.event_handler(event)
+
+        draw(grid)
+        update(grid)
 
     if grid.maze:
         generator_lib.free_maze(grid.maze)

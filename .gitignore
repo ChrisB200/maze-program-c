@@ -16,6 +16,7 @@ maze.txt
 test
 maze-solver
 maze-generator
+venv/
 
 # Debug and log files
 *.log
