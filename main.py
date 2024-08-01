@@ -81,6 +81,7 @@ generator_lib.print_graph.argtypes = [ctypes.POINTER(Maze)]
 
 generator_lib.reset_node.argtypes = [ctypes.POINTER(Node)]
 
+
 solver_lib.solve_maze.argtypes = [ctypes.POINTER(Maze)]
 
 solver_lib.create_bfs_info.argtypes = [ctypes.POINTER(Maze), ctypes.c_int, ctypes.c_int]
@@ -178,11 +179,12 @@ class Cell:
 
 
 class Grid:
-    def __init__(self, rows, cols, node_size):
+    def __init__(self, rows, cols):
         self.transform = pygame.math.Vector2()
         self.rows = rows
         self.cols = cols
-        self.node_size = node_size
+        self.node_size = None
+        self.calculate_node_size()
         self.line_size = math.floor(self.node_size[0] * 0.1)
 
         # c maze info
@@ -210,13 +212,19 @@ class Grid:
 
     @property
     def image(self):
-        return pygame.transform.scale(
+        return pygame.transform.smoothscale(
             self.surf,
             (
                 self.get_width(),
                 self.get_height(),
             ),
         )
+
+    def calculate_node_size(self):
+        if self.rows // 800 > 20:
+            self.node_size = (self.rows//800, self.rows//800)
+        else:
+            self.node_size = (20, 20)
 
     def cell_width(self):
         return self.node_size[0] + self.zoom_increment
@@ -233,10 +241,15 @@ class Grid:
     def get_size(self):
         return self.get_width() + 10, self.get_height() + 10
 
+    def get_center(self):
+        center_x = self.transform.x - (self.get_width() // 2)
+        center_y = self.transform.y - (self.get_height() // 2)
+        return pygame.math.Vector2(center_x, center_y)
+
     def rect(self):
         return pygame.Rect(
-            self.transform.x,
-            self.transform.y,
+            self.get_center().x,
+            self.get_center().y,
             self.get_width(),
             self.get_height(),
         )
@@ -246,7 +259,7 @@ class Grid:
 
         if self.rect().collidepoint(mouse):
             outer = pygame.math.Vector2(mouse)
-            change = outer - self.transform
+            change = outer - self.get_center()
             col = int(change.x / self.cell_width())
             row = int(change.y / self.cell_height())
 
@@ -300,7 +313,6 @@ class Grid:
         if event.type == pygame.KEYUP:
             if event.key == pygame.K_LSHIFT:
                 self.isHolding = False
-
         if event.type == pygame.MOUSEBUTTONDOWN:
             mouse = pygame.math.Vector2(pygame.mouse.get_pos())
             if self.check_sidebar(mouse):
@@ -326,7 +338,7 @@ class Grid:
                     self.end = self.hovered_cells[-1]
                     self.cells[self.end].set_state("end", self.surf)
         if event.type == pygame.MOUSEWHEEL:
-            self.zoom_increment += event.y * 5
+            self.zoom_increment += event.y
 
     def handle_dragging(self):
         if self.isDragging:
@@ -384,7 +396,7 @@ class Grid:
             cell.draw(self.surf)
 
     def draw(self):
-        WINDOW.blit(self.image, self.transform)
+        WINDOW.blit(self.image, self.get_center())
 
     def show_solved(self, cell):
         cell = cell
@@ -462,7 +474,7 @@ def main():
     manager = pygame_gui.UIManager((WIDTH, HEIGHT))
     manager.preload_fonts(fonts_to_preload)
 
-    grid = Grid(50, 50, (20, 20))
+    grid = Grid(50, 50)
 
     sidebar = pygame_gui.elements.UIPanel(
         relative_rect=pygame.Rect(1200, 0, 300, 800),
@@ -489,7 +501,7 @@ def main():
     row_slider = pygame_gui.elements.UIHorizontalSlider(
         relative_rect=pygame.Rect(0, 20, 250, 30),
         start_value=50,
-        value_range=(5, 100),
+        value_range=(5, 500),
         manager=manager,
         container=sidebar,
         anchors={"centerx": "centerx", "top_target": row_lbl},
@@ -543,7 +555,7 @@ def main():
             if event.type == pygame_gui.UI_BUTTON_PRESSED:
                 if event.ui_element == generate_btn:
                     row_slider_value = row_slider.get_current_value()
-                    grid = Grid(row_slider_value, row_slider_value, (50, 50))
+                    grid = Grid(row_slider_value, row_slider_value)
                 if event.ui_element == algorithm_btn:
                     grid.start_solving()
                 if event.ui_element == reset_btn:
