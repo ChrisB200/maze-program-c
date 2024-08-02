@@ -4,6 +4,7 @@ import sys
 import math
 import os
 import ctypes
+from enum import IntEnum
 
 
 def load_shared_library(filename):
@@ -18,16 +19,24 @@ generator_lib = load_shared_library("lib/maze-generator.so")
 solver_lib = load_shared_library("lib/maze-solver.so")
 DIRECTIONS = {"TOP": 0, "RIGHT": 1, "BOTTOM": 2, "LEFT": 3}
 
+
+class Algorithms(IntEnum):
+    BFS = 0
+    DJIKSTRA = 1
+    ASTAR = 2
+    BELLMAN = 3
+
+
 DRAW_RECT = pygame.USEREVENT + 9999
 
 # Preload the necessary fonts
 fonts_to_preload = [
-    {'name': 'noto_sans', 'point_size': 12, 'style': 'regular', 'antialiased': True},
-    {'name': 'noto_sans', 'point_size': 18, 'style': 'regular', 'antialiased': True},
-    {'name': 'noto_sans', 'point_size': 24, 'style': 'regular', 'antialiased': True},
-    {'name': 'noto_sans', 'point_size': 36, 'style': 'regular', 'antialiased': True},
-    {'name': 'noto_sans', 'point_size': 48, 'style': 'regular', 'antialiased': True},
-    {'name': 'noto_sans', 'point_size': 64, 'style': 'regular', 'antialiased': True},
+    {"name": "noto_sans", "point_size": 12, "style": "regular", "antialiased": True},
+    {"name": "noto_sans", "point_size": 18, "style": "regular", "antialiased": True},
+    {"name": "noto_sans", "point_size": 24, "style": "regular", "antialiased": True},
+    {"name": "noto_sans", "point_size": 36, "style": "regular", "antialiased": True},
+    {"name": "noto_sans", "point_size": 48, "style": "regular", "antialiased": True},
+    {"name": "noto_sans", "point_size": 64, "style": "regular", "antialiased": True},
 ]
 
 
@@ -71,6 +80,14 @@ class BfsInfo(ctypes.Structure):
     ]
 
 
+class SearchInfo(ctypes.Structure):
+    _fields_ = [
+        ("start", ctypes.c_int),
+        ("end", ctypes.c_int),
+        ("bfs", ctypes.POINTER(BfsInfo)),
+    ]
+
+
 # function prototypes
 generator_lib.generate_maze.argtypes = [ctypes.c_int, ctypes.c_int]
 generator_lib.generate_maze.restype = ctypes.POINTER(Maze)
@@ -84,15 +101,27 @@ generator_lib.reset_node.argtypes = [ctypes.POINTER(Node)]
 
 solver_lib.solve_maze.argtypes = [ctypes.POINTER(Maze)]
 
+solver_lib.create_search_info.argtypes = [
+    ctypes.POINTER(Maze),
+    ctypes.c_int,
+    ctypes.c_int,
+]
+solver_lib.create_search_info.restype = ctypes.POINTER(SearchInfo)
+
+solver_lib.free_search_info.argtypes = [ctypes.POINTER(SearchInfo)]
+
 solver_lib.create_bfs_info.argtypes = [ctypes.POINTER(Maze), ctypes.c_int, ctypes.c_int]
 solver_lib.create_bfs_info.restype = ctypes.POINTER(BfsInfo)
 
 solver_lib.free_bfs_info.argtypes = [ctypes.POINTER(BfsInfo)]
 
-solver_lib.shortest_path.argtypes = [ctypes.POINTER(Maze)]
+solver_lib.shortest_path.argtypes = [ctypes.POINTER(Maze), ctypes.POINTER(SearchInfo)]
 
 solver_lib.bfs_step.argtypes = [ctypes.POINTER(Maze), ctypes.POINTER(BfsInfo)]
-solver_lib.bfs_step.restypes = ctypes.c_int
+solver_lib.bfs_step.restype = ctypes.c_int
+
+solver_lib.dfs_step.argtypes = [ctypes.POINTER(Maze), ctypes.POINTER(DfsInfo)]
+solver_lib.dfs_step.restype = ctypes.c_int
 
 
 class Cell:
@@ -189,7 +218,7 @@ class Grid:
 
         # c maze info
         self.maze = None
-        self.bfs_info = None
+        self.search_info = None
 
         # movement
         self.zoom_increment = 0
@@ -204,11 +233,20 @@ class Grid:
         self.speed = 1
         self.hovered_cells = []
         self.changed_cells = []
-        self.start = None
-        self.end = None
         self.bounds = pygame.math.Vector2(1200, 800)
 
+        # searching
+        self.start = None
+        self.end = None
+        self.current_algorithm = Algorithms.BFS
+
         self.get_maze()
+
+    @property
+    def bfs(self):
+        if self.search_info:
+            return self.search_info.contents.bfs.contents
+        return None
 
     @property
     def image(self):
@@ -222,7 +260,7 @@ class Grid:
 
     def calculate_node_size(self):
         if self.rows // 800 > 20:
-            self.node_size = (self.rows//800, self.rows//800)
+            self.node_size = (self.rows // 800, self.rows // 800)
         else:
             self.node_size = (20, 20)
 
@@ -304,9 +342,61 @@ class Grid:
             return False
         return True
 
+    def handle_searching(self):
+        if not self.search_info:
+            self.search_info = solver_lib.create_search_info(
+                self.maze, self.start, self.end
+            )
+        if self.current_algorithm == Algorithms.BFS:
+            self.bfs_step()
+
+    def drag_down(self, event):
+        mouse = pygame.math.Vector2(pygame.mouse.get_pos())
+        if not self.check_sidebar(mouse):
+            return
+        if not event.button == 1:
+            return
+        if not self.isHolding:
+            return
+        if not self.rect().collidepoint(mouse):
+            return
+
+        self.isDragging = True
+        self.mousePositions.append(mouse)
+
+    def drag_up(self, event):
+        mouse = pygame.math.Vector2(pygame.mouse.get_pos())
+        if not self.check_sidebar(mouse):
+            return
+
+        if event.button == 1 and self.isDragging:
+            self.isDragging = False
+            self.mousePositions.clear()
+
+        if self.isDragging:
+            return
+        if self.isHolding:
+            return
+
+        # place start color
+        if event.button == 1 and self.rect().collidepoint(mouse):
+            if self.start:
+                self.reset_cells()
+                self.cells[self.start].set_state("bg", self.surf)
+            self.start = self.hovered_cells[-1]
+            self.cells[self.start].set_state("start", self.surf)
+
+        # place end color
+        if event.button == 3 and self.rect().collidepoint(mouse):
+            if self.end:
+                self.cells[self.end].set_state("bg", self.surf)
+
+            self.end = self.hovered_cells[-1]
+            self.cells[self.end].set_state("end", self.surf)
+
     def event_handler(self, event):
         if event.type == DRAW_RECT:
-            self.bfs_step()
+            self.handle_searching()
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LSHIFT:
                 self.isHolding = True
@@ -314,29 +404,9 @@ class Grid:
             if event.key == pygame.K_LSHIFT:
                 self.isHolding = False
         if event.type == pygame.MOUSEBUTTONDOWN:
-            mouse = pygame.math.Vector2(pygame.mouse.get_pos())
-            if self.check_sidebar(mouse):
-                if event.button == 1 and self.isHolding and self.rect().collidepoint(mouse):
-                    self.isDragging = True
-                    self.mousePositions.append(mouse)
+            self.drag_down(event)
         if event.type == pygame.MOUSEBUTTONUP:
-            mouse = pygame.math.Vector2(pygame.mouse.get_pos())
-            if self.check_sidebar(mouse):
-                if event.button == 1 and self.isDragging:
-                    self.isDragging = False
-                    self.mousePositions.clear()
-                if event.button == 1 and self.rect().collidepoint(mouse) and not self.isDragging and not self.isHolding:
-                    if self.start:
-                        self.reset_cells()
-                        self.cells[self.start].set_state("bg", self.surf)
-                    self.start = self.hovered_cells[-1]
-                    self.cells[self.start].set_state("start", self.surf)
-                if event.button == 3 and self.rect().collidepoint(mouse):
-                    if self.end:
-                        self.cells[self.end].set_state("bg", self.surf)
-
-                    self.end = self.hovered_cells[-1]
-                    self.cells[self.end].set_state("end", self.surf)
+            self.drag_up(event)
         if event.type == pygame.MOUSEWHEEL:
             self.zoom_increment += event.y
 
@@ -360,9 +430,9 @@ class Grid:
             generator_lib.free_maze(self.maze)
             self.maze = None
 
-        if self.bfs_info:
-            solver_lib.free_bfs_info(self.bfs_info)
-            self.bfs_info = None
+        if self.search_info:
+            solver_lib.free_search_info(self.search_info)
+            self.search_info = None
 
         self.maze = generator_lib.generate_maze(self.cols, self.rows)
 
@@ -399,6 +469,7 @@ class Grid:
         WINDOW.blit(self.image, self.get_center())
 
     def show_solved(self, cell):
+        print("showing Solving")
         cell = cell
         while cell.node.parent != -1:
             if cell.state != "start" or cell.state != "end":
@@ -408,12 +479,14 @@ class Grid:
         self.cells[self.end].set_state("end", self.surf)
 
     def bfs_step(self):
-        if not self.bfs_info:
-            self.bfs_info = solver_lib.create_bfs_info(self.maze, self.start, self.end)
+        if not self.search_info:
+            self.search_info = solver_lib.create_search_info(
+                self.maze, self.start, self.end
+            )
 
-        step = solver_lib.bfs_step(self.maze, self.bfs_info)
-        if self.bfs_info.contents.solved:
-            solver_lib.shortest_path(self.maze)
+        step = solver_lib.bfs_step(self.maze, self.search_info.contents.bfs)
+        if self.bfs.solved:
+            solver_lib.shortest_path(self.maze, self.search_info)
 
         if step != -1:
             cell = self.cells[step]
@@ -421,7 +494,7 @@ class Grid:
             if cell.state != "start" or cell.state != "end":
                 self.cells[step].set_state("search", self.surf)
         else:
-            cell = self.cells[self.bfs_info.contents.end]
+            cell = self.cells[self.bfs.end]
             self.show_solved(cell)
             self.isSolving = False
 
@@ -431,9 +504,9 @@ class Grid:
                 generator_lib.reset_node(cell.node_pointer)
                 cell.set_state("bg", self.surf)
                 self.changed_cells.pop(count)
-        if self.bfs_info:
-            solver_lib.free_bfs_info(self.bfs_info)
-        self.bfs_info = None
+        if self.search_info:
+            solver_lib.free_search_info(self.search_info)
+        self.search_info = None
 
 
 def draw(grid):
@@ -501,7 +574,7 @@ def main():
     row_slider = pygame_gui.elements.UIHorizontalSlider(
         relative_rect=pygame.Rect(0, 20, 250, 30),
         start_value=50,
-        value_range=(5, 500),
+        value_range=(5, 150),
         manager=manager,
         container=sidebar,
         anchors={"centerx": "centerx", "top_target": row_lbl},
@@ -517,7 +590,7 @@ def main():
 
     algorithm_dropdown = pygame_gui.elements.UIDropDownMenu(
         relative_rect=pygame.Rect(-1, 80, 200, 40),
-        options_list=["Breadth-First", "Depth-First", "Djikstras", "A*"],
+        options_list=["Breadth-First", "Djikstras", "A*", "Bellman-Ford"],
         starting_option="Breadth-First",
         manager=manager,
         container=sidebar,
@@ -552,6 +625,20 @@ def main():
                 if event.ui_element == row_slider:
                     slider_value = row_slider.get_current_value()
                     row_lbl.set_text(f"Rows & Columns: {slider_value}")
+            if event.type == pygame_gui.UI_DROP_DOWN_MENU_CHANGED:
+                if event.ui_element == algorithm_dropdown:
+                    selected_option = algorithm_dropdown.selected_option[0]
+                    print(selected_option)
+                    match selected_option.lower():
+                        case "breadth-first":
+                            grid.current_algorithm = Algorithms.BFS
+                        case "djikstras":
+                            grid.current_algorithm = Algorithms.DJIKSTRA
+                        case "a*":
+                            grid.current_algorithm = Algorithms.ASTAR
+                        case "bellman-ford":
+                            grid.current_algorithm = Algorithms.BELLMAN
+
             if event.type == pygame_gui.UI_BUTTON_PRESSED:
                 if event.ui_element == generate_btn:
                     row_slider_value = row_slider.get_current_value()

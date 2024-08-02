@@ -16,53 +16,80 @@ typedef struct {
     int *queue;
 } bfs_info;
 
+typedef struct {
+    int max_size;
+    int start;
+    int end;
+    int top;
+    bool solved;
+    bool *visited;
+    int *stack;
+} dfs_info;
+
+typedef struct {
+    int start;
+    int end;
+    bfs_info *bfs;
+} search_info;
+
 bfs_info *create_bfs_info(maze_t *maze, int start, int end) {
-    bfs_info *info = (bfs_info *)malloc(sizeof(bfs_info));
+    bfs_info *bfs = (bfs_info *)malloc(sizeof(bfs_info));
 
-    info->max_size = maze->num_nodes;
-    info->start = start;
-    info->end = end;
-    info->rear = -1;
-    info->front = 0;
-    info->solved = false;
+    bfs->max_size = maze->num_nodes;
+    bfs->start = start;
+    bfs->end = end;
+    bfs->rear = -1;
+    bfs->front = 0;
+    bfs->solved = false;
 
-    info->visited = (bool *)malloc(sizeof(bool) * info->max_size);
-    for (int i = 0; i < info->max_size; i++) {
-        info->visited[i] = false;
+    bfs->visited = (bool *)malloc(sizeof(bool) * bfs->max_size);
+    for (int i = 0; i < bfs->max_size; i++) {
+        bfs->visited[i] = false;
     }
 
-    info->queue = (int *)malloc(sizeof(int) * info->max_size);
-    for (int i = 0; i < info->max_size; i++) {
-        info->queue[i] = 0;
+    bfs->queue = (int *)malloc(sizeof(int) * bfs->max_size);
+    for (int i = 0; i < bfs->max_size; i++) {
+        bfs->queue[i] = 0;
     }
 
     // add entrance vertex into queue
-    info->rear++;
-    info->queue[info->rear] = start;
-    info->visited[start] = true;
+    bfs->rear++;
+    bfs->queue[bfs->rear] = start;
+    bfs->visited[start] = true;
     maze->nodes[start]->path = true;
 
+    return bfs;
+}
+
+void free_bfs_info(bfs_info *bfs) {
+    free(bfs->visited);
+    free(bfs->queue);
+    free(bfs);
+}
+
+search_info *create_search_info(maze_t *maze, int start, int end) {
+    search_info *info = (search_info *)malloc(sizeof(search_info));
+
+    info->start = start;
+    info->end = end;
+    info->bfs = create_bfs_info(maze, start, end);
+    info->dfs = create_dfs_info(maze, start, end);
     return info;
 }
 
-void free_bfs_info(bfs_info *info) {
-    free(info->visited);
-    free(info->queue);
+void free_search_info(search_info *info) {
+    if (info->bfs != NULL) {
+        free_bfs_info(info->bfs);
+    }
+    if (info->dfs != NULL) {
+        free_dfs_info(info->dfs);
+    }
     free(info);
 }
 
-void randomise_directions(Directions directions[]) {
-    for (int i = 0; i < 4; i++) {
-        int j = rand() % 4;
-        Directions temp = directions[i];
-        directions[i] = directions[j];
-        directions[j] = temp;
-    }
-}
-
-void shortest_path(maze_t *maze) {
-    node_t *entrance = maze->nodes[0];
-    node_t *exit = maze->nodes[maze->num_nodes-1];
+void shortest_path(maze_t *maze, search_info *info) {
+    node_t *entrance = maze->nodes[info->start];
+    node_t *exit = maze->nodes[info->end];
     node_t *curr = exit;
 
     while (true) {
@@ -83,29 +110,29 @@ void shortest_path(maze_t *maze) {
     }
 }
 
-int bfs_step(maze_t *maze, bfs_info *info) {
-    if (info->solved) {
+int bfs_step(maze_t *maze, bfs_info *bfs) {
+    if (bfs->solved) {
         return -1;
     }
     // get vertex from queue
-    int vertex = info->queue[info->front];
+    int vertex = bfs->queue[bfs->front];
     node_t *curr = maze->nodes[vertex];
-    info->front++;
+    bfs->front++;
 
     // check if the vertex is the exit
-    if (vertex == info->end) {
-        info->solved = true;
+    if (vertex == bfs->end) {
+        bfs->solved = true;
         return vertex;
     }
 
     // add all adjacent vertices to queue
     curr = maze->nodes[vertex];
     while (curr != NULL) {
-        if (info->visited[curr->vertex] == false) {
+        if (bfs->visited[curr->vertex] == false) {
             // add adjacent vertex to queue
-            info->rear++;
-            info->queue[info->rear] = curr->vertex;
-            info->visited[curr->vertex] = true;
+            bfs->rear++;
+            bfs->queue[bfs->rear] = curr->vertex;
+            bfs->visited[curr->vertex] = true;
             maze->nodes[curr->vertex]->parent = vertex;
             maze->nodes[curr->vertex]->searched = true;
         }
@@ -119,7 +146,7 @@ void instant_bfs(maze_t *maze, int entrance, int exit) {
     bool visited[max_size];
 
     // intialise queue
-    int queue[max_size*2];
+    int queue[max_size * 2];
     int rear = -1;
     int front = 0;
 
@@ -158,9 +185,6 @@ void instant_bfs(maze_t *maze, int entrance, int exit) {
             curr = curr->next;
         }
     }
-    shortest_path(maze);
 }
 
-void solve_maze(maze_t *maze) {
-    instant_bfs(maze, 0, maze->num_nodes-1);
-}
+void solve_maze(maze_t *maze) { instant_bfs(maze, 0, maze->num_nodes - 1); }
