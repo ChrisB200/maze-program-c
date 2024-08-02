@@ -33,3 +33,45 @@ __pycache__
 build/
 bin/
 obj/
+
+# Ignore the build directory
+/build/
+/out/
+/bin/
+/lib/
+/dist/
+
+# Ignore CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Ignore Visual Studio files
+CMakeScripts/
+*.vcxproj*
+*.sln
+
+# Ignore other IDE files (CLion, etc.)
+.idea/
+*.iml
+
+# Ignore log and temp files
+*.log
+*.tmp
+*.swp
+
+# Ignore Python bytecode
+__pycache__/
+*.py[cod]
+
+# Ignore virtual environments
+venv/
+env/
+
+# Ignore macOS specific files
+.DS_Store
+
+# Ignore Windows specific files
+Thumbs.db
+

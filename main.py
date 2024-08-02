@@ -7,16 +7,26 @@ import ctypes
 from enum import IntEnum
 
 
-def load_shared_library(filename):
-    path = os.path.join(os.path.dirname(__file__), filename)
+# Determine the correct library extension based on the platform
+if os.name == "nt":
+    lib_ext = "dll"
+else:
+    lib_ext = "so"
+
+
+def load_shared_library(filename, ext):
+    path = os.path.join(os.path.dirname(__file__), f"{filename}.{ext}")
     return ctypes.CDLL(path)
+
+
+# Load the libraries
+generator_lib = load_shared_library("lib/libmaze-generator", lib_ext)
+solver_lib = load_shared_library("lib/libmaze-solver", lib_ext)
 
 
 WIDTH, HEIGHT = 1500, 800
 WINDOW = pygame.display.set_mode((WIDTH, HEIGHT))
 
-generator_lib = load_shared_library("lib/maze-generator.so")
-solver_lib = load_shared_library("lib/maze-solver.so")
 DIRECTIONS = {"TOP": 0, "RIGHT": 1, "BOTTOM": 2, "LEFT": 3}
 
 
@@ -119,9 +129,6 @@ solver_lib.shortest_path.argtypes = [ctypes.POINTER(Maze), ctypes.POINTER(Search
 
 solver_lib.bfs_step.argtypes = [ctypes.POINTER(Maze), ctypes.POINTER(BfsInfo)]
 solver_lib.bfs_step.restype = ctypes.c_int
-
-solver_lib.dfs_step.argtypes = [ctypes.POINTER(Maze), ctypes.POINTER(DfsInfo)]
-solver_lib.dfs_step.restype = ctypes.c_int
 
 
 class Cell:
@@ -469,7 +476,6 @@ class Grid:
         WINDOW.blit(self.image, self.get_center())
 
     def show_solved(self, cell):
-        print("showing Solving")
         cell = cell
         while cell.node.parent != -1:
             if cell.state != "start" or cell.state != "end":

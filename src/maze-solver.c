@@ -73,16 +73,12 @@ search_info *create_search_info(maze_t *maze, int start, int end) {
     info->start = start;
     info->end = end;
     info->bfs = create_bfs_info(maze, start, end);
-    info->dfs = create_dfs_info(maze, start, end);
     return info;
 }
 
 void free_search_info(search_info *info) {
     if (info->bfs != NULL) {
         free_bfs_info(info->bfs);
-    }
-    if (info->dfs != NULL) {
-        free_dfs_info(info->dfs);
     }
     free(info);
 }
