@@ -1,13 +1,28 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import sys
+from PyInstaller.utils.hooks import copy_metadata
+
+# Determine platform-specific library extensions and paths
+if sys.platform == 'win32':
+    # On Windows
+    binaries = [
+        ('lib/maze-generator.dll', '.'),
+        ('lib/maze-solver.dll', '.')
+    ]
+elif sys.platform == 'linux':
+    # On Linux
+    binaries = [
+        ('lib/libmaze-generator.so', '.'),
+        ('lib/libmaze-solver.so', '.')
+    ]
+else:
+    raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[
-        ('lib/libmaze-generator.dll', '.'),
-        ('lib/libmaze-solver.dll', '.')
-    ],
+    binaries=binaries,
     datas=[],
     hiddenimports=[],
     hookspath=[],
@@ -17,6 +32,7 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
@@ -39,3 +55,4 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
 )
+
