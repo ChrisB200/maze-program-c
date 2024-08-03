@@ -6,14 +6,15 @@ This program is made in both **C** and **Python**. The generator and solver is m
 Currently the maze generator uses **backtracking** to create the maze and the maze-solver uses **Breadth-First Search**. In the future i am looking to expand the number of algorithms for both generation and searching.
 
 ## Table of Contents
--[Preview](#preview)
--[Platforms](#platforms)
--[Installation](#installation)
-    -[Get Source Code](#get-source-code)
-    -[Dependencies](#dependencies)
-        -[Windows](#windows)
-        -[Linux](#linux)
-    -[Compilation](#compilation)
+- [Preview](#preview)
+- [Platforms](#platforms)
+- [Installation](#installation)
+    - [Get Source Code](#get-source-code)
+    - [Dependencies](#dependencies)
+        - [Windows](#windows)
+        - [Linux](#linux)
+    - [Compilation](#compilation)
+
 
 ## Preview
 ![Preview image of the application](images/preview.png)
