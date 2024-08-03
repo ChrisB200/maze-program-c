@@ -4,15 +4,13 @@ import sys
 import math
 import os
 import ctypes
+import platform
 from enum import IntEnum
 
-
-# Determine the correct library extension based on the platform
-if os.name == "nt":
+if platform.system() == "Windows":
     lib_ext = "dll"
 else:
     lib_ext = "so"
-
 
 def load_shared_library(filename, ext):
     path = os.path.join(os.path.dirname(__file__), f"{filename}.{ext}")

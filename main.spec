@@ -5,8 +5,8 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[
-        ('lib/libmaze-generator.so', '.'),
-        ('lib/libmaze-solver.so', '.')
+        ('lib/libmaze-generator.dll', '.'),
+        ('lib/libmaze-solver.dll', '.')
     ],
     datas=[],
     hiddenimports=[],
