@@ -27,7 +27,7 @@ You should be able to compile the program successfully on the following platform
 ### Get Source Code
 Clone the repository using the following command:
 ```git
-    git clone https://github.com/ChrisB200/maze-program-c.git
+git clone https://github.com/ChrisB200/maze-program-c.git
 ```
 ### Dependencies
 To compile this program you will need the following based on your platform:
@@ -43,32 +43,32 @@ To compile this program you will need the following based on your platform:
 ### Compilation
 Firstly make a build directory within the project and cd into it:
 ```
-    mkdir build
-    cd build
+mkdir build
+cd build
 ```
 
 Once you are in that directory run this command:
 ```
-    cmake ..
+cmake ..
 ```
 
 Then build the project:
 ```
-    cmake --build .
+cmake --build .
 ```
 
 To install all the required python dependencies you can run:
 ```
-    pip install -r requirements.txt
-    pip install pyinstaller
+pip install -r requirements.txt
+pip install pyinstaller
 ```
 
 You can now either run the project using:
 ```
-    python main.py
+python main.py
 ```
 
 Or you can create an executable file:
 ```
-    pyinstaller main.spec
+pyinstaller main.spec
 ```
