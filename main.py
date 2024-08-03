@@ -594,7 +594,7 @@ def main():
 
     algorithm_dropdown = pygame_gui.elements.UIDropDownMenu(
         relative_rect=pygame.Rect(-1, 80, 200, 40),
-        options_list=["Breadth-First", "Djikstras", "A*", "Bellman-Ford"],
+        options_list=["Breadth-First"],
         starting_option="Breadth-First",
         manager=manager,
         container=sidebar,
