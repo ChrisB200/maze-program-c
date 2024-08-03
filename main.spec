@@ -7,8 +7,8 @@ from PyInstaller.utils.hooks import copy_metadata
 if sys.platform == 'win32':
     # On Windows
     binaries = [
-        ('lib/maze-generator.dll', '.'),
-        ('lib/maze-solver.dll', '.')
+        ('lib/libmaze-generator.dll', '.'),
+        ('lib/libmaze-solver.dll', '.')
     ]
 elif sys.platform == 'linux':
     # On Linux
