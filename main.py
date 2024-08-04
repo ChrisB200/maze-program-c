@@ -497,7 +497,7 @@ class Grid:
             cell.draw(self.surf)
 
     def draw(self):
-        WINDOW.blit(self.clipped_img, (0, 0))
+        WINDOW.blit(self.image, self.get_center())
 
     def show_solved(self, cell):
         cell = cell
