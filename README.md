@@ -71,5 +71,5 @@ python main.py
 
 Or you can create an executable file:
 ```
-pyinstaller main.spec
+pyinstaller --noconsole main.spec
 ```

@@ -1,5 +1,5 @@
-import pygame
 import pygame_gui
+import pygame
 import sys
 import math
 import os
@@ -7,10 +7,13 @@ import ctypes
 import platform
 from enum import IntEnum
 
+os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
+
 if platform.system() == "Windows":
     lib_ext = "dll"
 else:
     lib_ext = "so"
+
 
 def load_shared_library(filename, ext):
     path = os.path.join(os.path.dirname(__file__), f"{filename}.{ext}")
@@ -230,6 +233,7 @@ class Grid:
         self.mousePositions = []
         self.isDragging = False
         self.isHolding = False
+        self.bounding_rect = pygame.Rect(0, 0, 1200, 800)
 
         # cells
         self.surf = pygame.Surface(self.get_size())
@@ -246,6 +250,7 @@ class Grid:
         self.current_algorithm = Algorithms.BFS
 
         self.get_maze()
+        self.initial_position()
 
     @property
     def bfs(self):
@@ -289,6 +294,13 @@ class Grid:
         center_y = self.transform.y - (self.get_height() // 2)
         return pygame.math.Vector2(center_x, center_y)
 
+    def initial_position(self):
+        # Assuming WIDTH and HEIGHT are the dimensions of the screen
+        center_x = (WIDTH - 300) // 2
+        center_y = HEIGHT // 2
+        self.transform.x = center_x
+        self.transform.y = center_y
+
     def rect(self):
         return pygame.Rect(
             self.get_center().x,
@@ -296,6 +308,11 @@ class Grid:
             self.get_width(),
             self.get_height(),
         )
+
+    def check_places(self):
+        if not self.start or not self.end:
+            return False
+        return True
 
     def get_cell(self):
         mouse = pygame.mouse.get_pos()
@@ -339,19 +356,24 @@ class Grid:
             self.isSolving = False
             pygame.time.set_timer(pygame.event.Event(DRAW_RECT), 0)
         else:
-            self.isSolving = True
-            pygame.time.set_timer(pygame.event.Event(DRAW_RECT), self.speed)
+            if self.check_places():
+                self.isSolving = True
+                pygame.time.set_timer(pygame.event.Event(DRAW_RECT), self.speed)
 
     def check_sidebar(self, mouse):
         if mouse.x >= 1200:
             return False
         return True
 
-    def handle_searching(self):
+    def create_search_info(self):
         if not self.search_info:
-            self.search_info = solver_lib.create_search_info(
-                self.maze, self.start, self.end
-            )
+            if self.check_places():
+                self.search_info = solver_lib.create_search_info(
+                    self.maze, self.start, self.end
+                )
+
+    def handle_searching(self):
+        self.create_search_info()
         if self.current_algorithm == Algorithms.BFS:
             self.bfs_step()
 
@@ -370,6 +392,8 @@ class Grid:
         self.mousePositions.append(mouse)
 
     def drag_up(self, event):
+        if len(self.hovered_cells) == 0:
+            return
         mouse = pygame.math.Vector2(pygame.mouse.get_pos())
         if not self.check_sidebar(mouse):
             return
@@ -414,6 +438,8 @@ class Grid:
             self.drag_up(event)
         if event.type == pygame.MOUSEWHEEL:
             self.zoom_increment += event.y
+            if self.get_width() <= 20 or self.get_height() <= 20:
+                self.zoom_increment -= event.y
 
     def handle_dragging(self):
         if self.isDragging:
@@ -471,7 +497,7 @@ class Grid:
             cell.draw(self.surf)
 
     def draw(self):
-        WINDOW.blit(self.image, self.get_center())
+        WINDOW.blit(self.clipped_img, (0, 0))
 
     def show_solved(self, cell):
         cell = cell
@@ -483,10 +509,10 @@ class Grid:
         self.cells[self.end].set_state("end", self.surf)
 
     def bfs_step(self):
-        if not self.search_info:
-            self.search_info = solver_lib.create_search_info(
-                self.maze, self.start, self.end
-            )
+        self.create_search_info()
+
+        if not self.check_places():
+            return
 
         step = solver_lib.bfs_step(self.maze, self.search_info.contents.bfs)
         if self.bfs.solved:
@@ -617,6 +643,14 @@ def main():
         anchors={"centerx": "centerx", "top_target": algorithm_btn},
     )
 
+    exit_btn = pygame_gui.elements.UIButton(
+        relative_rect=pygame.Rect(-1, 40, 200, 50),
+        text="Exit",
+        manager=manager,
+        container=sidebar,
+        anchors={"centerx": "centerx", "top_target": reset_btn},
+    )
+
     clock = pygame.time.Clock()
 
     while run:
@@ -664,6 +698,8 @@ def main():
                         manager=manager,
                         window_title="Message",
                     )
+                if event.ui_element == exit_btn:
+                    pygame.event.post(pygame.event.Event(pygame.QUIT))
 
             manager.process_events(event)
             grid.event_handler(event)
@@ -674,6 +710,9 @@ def main():
     if grid.maze:
         generator_lib.free_maze(grid.maze)
         grid.maze = None
+    if grid.search_info:
+        generator_lib.free(grid.search_info)
+        grid.search_info = None
 
     pygame.quit()
     sys.exit()
